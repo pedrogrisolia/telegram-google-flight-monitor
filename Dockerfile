@@ -1,12 +1,20 @@
 FROM node:20-slim
 
-# Install Chrome dependencies, Chromium, and SQLite
+# Install Chrome dependencies, Chromium, SQLite, and locales
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \
     sqlite3 \
+    locales \
     --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/pt_BR.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen
+
+# Set locale
+ENV LANG pt_BR.UTF-8
+ENV LANGUAGE pt_BR:pt
+ENV LC_ALL pt_BR.UTF-8
 
 # Create app directory
 WORKDIR /app

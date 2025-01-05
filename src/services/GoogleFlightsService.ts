@@ -64,17 +64,33 @@ export class GoogleFlightsService {
         }
 
         const browser = await puppeteer.launch({
-            headless: "new",
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--lang=pt-BR'
+            ]
         });
 
         try {
             const page = await browser.newPage();
-            await page.setViewport({ width: 1280, height: 800 });
             
-            await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 }).catch(() => {
-                throw new Error('Failed to load the page');
+            // Set Brazilian Portuguese language and location
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'pt-BR,pt;q=0.9'
             });
+
+            await page.setGeolocation({
+                latitude: -23.5505,  // São Paulo coordinates
+                longitude: -46.6333
+            });
+
+            // Ensure URL has Brazilian currency
+            if (!url.includes('curr=BRL')) {
+                url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
+            }
+
+            await page.goto(url, { waitUntil: 'networkidle0' });
 
             // Wait for flight results
             const mainContent = await page.waitForSelector('[role="main"]', { timeout: 10000 })
@@ -150,19 +166,18 @@ export class GoogleFlightsService {
             }));
 
         } catch (error) {
-            console.error('Error scraping flight prices:', error);
+            console.error('Error fetching flight prices:', error);
             throw error;
         } finally {
-            if (browser) {
-                await browser.close();
-            }
+            await browser.close();
         }
     }
 
     static async testRun(): Promise<void> {
         try {
             console.log("Testing Google Flights Search...");
-            const testUrl = "https://www.google.com/travel/flights/search?tfs=CBwQAhotEgoyMDI1LTA0LTI1agwIAxIIL20vMDZnbXJyEQgDEg0vZy8xMWJjNnhscHBkQAFIAXABggELCP___________wGYAQI&tfu=EgoIABAAGAAgASgE&curr=BRL";
+            // Update test URL to include Brazilian parameters
+            const testUrl = "https://www.google.com/travel/flights/search?tfs=CBwQAhotEgoyMDI1LTA0LTI1agwIAxIIL20vMDZnbXJyEQgDEg0vZy8xMWJjNnhscHBkQAFIAXABggELCP___________wGYAQI&tfu=EgoIABAAGAAgASgE&curr=BRL&hl=pt-BR";
             const results = await this.getFlightPricesFromUrl(testUrl);
             
             console.log("\nFlight Information:");
