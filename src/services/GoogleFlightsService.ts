@@ -71,34 +71,99 @@ export class GoogleFlightsService {
         return url;
     }
 
-    static async getFlightPricesFromUrl(url: string, retries = 3): Promise<FlightDetails[]> {
-        // First try with 11 underscores
-        try {
-            const urlWith11 = this.cleanUrl(url, 11);
-            if (!this.validateGoogleFlightsUrl(urlWith11)) {
-                throw new Error('Invalid Google Flights URL');
-            }
-            const results = await this.scrapeFlightPrices(urlWith11, retries);
-            return results.map(result => ({
-                ...result,
-                successfulUrl: urlWith11
-            }));
-        } catch (error11) {
-            console.log("Failed with 11 underscores, trying with 12...");
-            // If that fails, try with 12 underscores
+    private static countUnderscores(url: string): number {
+        const tfsMatch = url.match(/tfs=([^&]*)/);
+        if (!tfsMatch) return 0;
+        return (tfsMatch[1].match(/_/g) || []).length;
+    }
+
+    static async getFlightPricesFromUrl(url: string, retries = 2): Promise<FlightDetails[]> {
+        const underscoreCount = this.countUnderscores(url);
+        console.log(`URL has ${underscoreCount} underscores`);
+
+        // Case 1: Less than 11 underscores
+        if (underscoreCount < 11) {
             try {
-                const urlWith12 = this.cleanUrl(url, 12);
-                if (!this.validateGoogleFlightsUrl(urlWith12)) {
+                const urlWith11 = this.cleanUrl(url, 11);
+                if (!this.validateGoogleFlightsUrl(urlWith11)) {
                     throw new Error('Invalid Google Flights URL');
                 }
-                const results = await this.scrapeFlightPrices(urlWith12, retries);
+                const results = await this.scrapeFlightPrices(urlWith11, retries);
                 return results.map(result => ({
                     ...result,
-                    successfulUrl: urlWith12
+                    successfulUrl: urlWith11
                 }));
-            } catch (error12) {
-                // If both fail, throw the original error
-                throw error11;
+            } catch (error11) {
+                console.log("Failed with 11 underscores, trying with 12...");
+                try {
+                    const urlWith12 = this.cleanUrl(url, 12);
+                    if (!this.validateGoogleFlightsUrl(urlWith12)) {
+                        throw new Error('Invalid Google Flights URL');
+                    }
+                    const results = await this.scrapeFlightPrices(urlWith12, retries);
+                    return results.map(result => ({
+                        ...result,
+                        successfulUrl: urlWith12
+                    }));
+                } catch (error12) {
+                    throw error11;
+                }
+            }
+        }
+        
+        // Case 2: Exactly 11 underscores
+        if (underscoreCount === 11) {
+            try {
+                if (!this.validateGoogleFlightsUrl(url)) {
+                    throw new Error('Invalid Google Flights URL');
+                }
+                const results = await this.scrapeFlightPrices(url, retries);
+                return results.map(result => ({
+                    ...result,
+                    successfulUrl: url
+                }));
+            } catch (error11) {
+                console.log("Failed with original 11 underscores, trying with 12...");
+                try {
+                    const urlWith12 = this.cleanUrl(url, 12);
+                    if (!this.validateGoogleFlightsUrl(urlWith12)) {
+                        throw new Error('Invalid Google Flights URL');
+                    }
+                    const results = await this.scrapeFlightPrices(urlWith12, retries);
+                    return results.map(result => ({
+                        ...result,
+                        successfulUrl: urlWith12
+                    }));
+                } catch (error12) {
+                    throw error11;
+                }
+            }
+        }
+
+        // Case 3: 12 or more underscores
+        try {
+            if (!this.validateGoogleFlightsUrl(url)) {
+                throw new Error('Invalid Google Flights URL');
+            }
+            const results = await this.scrapeFlightPrices(url, retries);
+            return results.map(result => ({
+                ...result,
+                successfulUrl: url
+            }));
+        } catch (error12) {
+            console.log("Failed with original 12 underscores, trying with 11...");
+            try {
+                const urlWith11 = this.cleanUrl(url, 11);
+                if (!this.validateGoogleFlightsUrl(urlWith11)) {
+                    throw new Error('Invalid Google Flights URL');
+                }
+                const results = await this.scrapeFlightPrices(urlWith11, retries);
+                return results.map(result => ({
+                    ...result,
+                    successfulUrl: urlWith11
+                }));
+            } catch (error11) {
+                throw error12;
             }
         }
     }

@@ -215,6 +215,15 @@ export class TelegramService {
                 console.log(`Checking prices for URL: ${url} (${flights.length} flights)`);
                 const currentFlights = await GoogleFlightsService.getFlightPricesFromUrl(url);
                 
+                // If we got a different successful URL, update all flights with this URL
+                const successfulUrl = currentFlights[0]?.successfulUrl;
+                if (successfulUrl && successfulUrl !== url) {
+                    console.log(`Updating URL for ${flights.length} flights from ${url} to ${successfulUrl}`);
+                    for (const flight of flights) {
+                        flight.flightUrl = successfulUrl;
+                    }
+                }
+                
                 for (const flight of flights) {
                     const updatedFlight = currentFlights.find(f => 
                         f.departureTime === flight.departureTime && 
@@ -232,6 +241,10 @@ export class TelegramService {
                         await this.notifyPriceChange(flight, updatedFlight);
                     } else {
                         console.log(`No price change for flight ${flight.id}: ${flight.currentPrice}`);
+                        // Even if price didn't change, save the flight if URL was updated
+                        if (successfulUrl && successfulUrl !== url) {
+                            await AppDataSource.manager.save(flight);
+                        }
                     }
                 }
             }
