@@ -58,119 +58,127 @@ export class GoogleFlightsService {
         }
     }
 
-    static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
+    static async getFlightPricesFromUrl(url: string, retries = 3): Promise<FlightDetails[]> {
         if (!this.validateGoogleFlightsUrl(url)) {
             throw new Error('Invalid Google Flights URL');
         }
 
-        const browser = await puppeteer.launch({
-            headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--lang=pt-BR'
-            ]
-        });
-
-        try {
-            const page = await browser.newPage();
-            
-            // Set Brazilian Portuguese language and location
-            await page.setExtraHTTPHeaders({
-                'Accept-Language': 'pt-BR,pt;q=0.9'
+        let lastError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            const browser = await puppeteer.launch({
+                headless: "new",
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--lang=pt-BR'
+                ]
             });
 
-            await page.setGeolocation({
-                latitude: -23.5505,  // São Paulo coordinates
-                longitude: -46.6333
-            });
-
-            // Ensure URL has Brazilian currency
-            if (!url.includes('curr=BRL')) {
-                url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
-            }
-
-            await page.goto(url, { waitUntil: 'networkidle0' });
-
-            // Wait for flight results
-            const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 })
-                .catch(() => null);
-            
-            if (!mainContent) {
-                throw new Error('No flight results found');
-            }
-
-            // Extract information from the first 4 flights
-            const flights = await page.evaluate(() => {
-                const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
+            try {
+                console.log(`Attempt ${attempt} of ${retries} to fetch flight prices`);
+                const page = await browser.newPage();
                 
-                if (flightRows.length === 0) {
-                    return null;
+                await page.setExtraHTTPHeaders({
+                    'Accept-Language': 'pt-BR,pt;q=0.9'
+                });
+
+                await page.setGeolocation({
+                    latitude: -23.5505,
+                    longitude: -46.6333
+                });
+
+                if (!url.includes('curr=BRL')) {
+                    url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
                 }
 
-                return flightRows.map(row => {
-                    const stopDetails: StopDetails[] = [];
-                    const stopInfo = row.querySelector('.sSHqwe.tPgKwe.ogfYpf[aria-label*="Parada"]');
+                await page.goto(url, { waitUntil: 'networkidle0' });
+
+                const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 })
+                    .catch(() => null);
+                
+                if (!mainContent) {
+                    throw new Error('No flight results found');
+                }
+
+                // Extract information from the first 4 flights
+                const flights = await page.evaluate(() => {
+                    const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
                     
-                    if (stopInfo) {
-                        const stopMatch = stopInfo.getAttribute('aria-label')?.match(/Parada \(1 de 1\) de (.*?) no aeroporto (.*?), em/);
-                        if (stopMatch) {
-                            stopDetails.push({
-                                airport: row.querySelector('.sSHqwe.tPgKwe.ogfYpf span[aria-label]')?.textContent?.trim() || 'N/A',
-                                airportName: stopMatch[2] || 'N/A',
-                                duration: stopMatch[1] || 'N/A'
-                            });
+                    if (flightRows.length === 0) {
+                        return null;
+                    }
+
+                    return flightRows.map(row => {
+                        const stopDetails: StopDetails[] = [];
+                        const stopInfo = row.querySelector('.sSHqwe.tPgKwe.ogfYpf[aria-label*="Parada"]');
+                        
+                        if (stopInfo) {
+                            const stopMatch = stopInfo.getAttribute('aria-label')?.match(/Parada \(1 de 1\) de (.*?) no aeroporto (.*?), em/);
+                            if (stopMatch) {
+                                stopDetails.push({
+                                    airport: row.querySelector('.sSHqwe.tPgKwe.ogfYpf span[aria-label]')?.textContent?.trim() || 'N/A',
+                                    airportName: stopMatch[2] || 'N/A',
+                                    duration: stopMatch[1] || 'N/A'
+                                });
+                            }
                         }
+
+                        return {
+                            departureTime: row.querySelector('.mv1WYe span[aria-label*="Horário de partida"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
+                            arrivalTime: row.querySelector('.mv1WYe span[aria-label*="Horário de chegada"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
+                            duration: row.querySelector('.gvkrdb')?.textContent?.trim() || 'N/A',
+                            airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
+                            stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
+                            stopDetails,
+                            price: parseInt(row.querySelector('.YMlIz.FpEdX.jLMuyc span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
+                            emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
+                        };
+                    });
+                });
+
+                if (!flights) {
+                    throw new Error('Failed to extract flight information');
+                }
+
+                const commonInfo = await page.evaluate(() => {
+                    const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
+                    const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
+                    const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
+
+                    if (!originInput || !destinationInput || !dateInput) {
+                        return null;
                     }
 
                     return {
-                        departureTime: row.querySelector('.mv1WYe span[aria-label*="Horário de partida"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
-                        arrivalTime: row.querySelector('.mv1WYe span[aria-label*="Horário de chegada"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
-                        duration: row.querySelector('.gvkrdb')?.textContent?.trim() || 'N/A',
-                        airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
-                        stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
-                        stopDetails,
-                        price: parseInt(row.querySelector('.YMlIz.FpEdX.jLMuyc span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
-                        emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
+                        origin: originInput.value || 'N/A',
+                        destination: destinationInput.value || 'N/A',
+                        date: dateInput.value || 'N/A'
                     };
                 });
-            });
 
-            if (!flights) {
-                throw new Error('Failed to extract flight information');
-            }
-
-            const commonInfo = await page.evaluate(() => {
-                const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
-                const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
-                const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
-
-                if (!originInput || !destinationInput || !dateInput) {
-                    return null;
+                if (!commonInfo) {
+                    throw new Error('Failed to extract flight details');
                 }
 
-                return {
-                    origin: originInput.value || 'N/A',
-                    destination: destinationInput.value || 'N/A',
-                    date: dateInput.value || 'N/A'
-                };
-            });
+                await browser.close();
+                return flights.map(flight => ({
+                    ...flight,
+                    ...commonInfo
+                }));
 
-            if (!commonInfo) {
-                throw new Error('Failed to extract flight details');
+            } catch (error: any) {
+                lastError = error;
+                await browser.close();
+                
+                if (attempt < retries) {
+                    console.log(`Attempt ${attempt} failed. Retrying...`);
+                }
+                continue;
             }
-
-            return flights.map(flight => ({
-                ...flight,
-                ...commonInfo
-            }));
-
-        } catch (error) {
-            console.error('Error fetching flight prices:', error);
-            throw error;
-        } finally {
-            await browser.close();
         }
+
+        throw new Error(`Failed to fetch flight prices after ${retries} attempts. Last error: ${lastError?.message}`);
     }
 
     static async testRun(): Promise<void> {
