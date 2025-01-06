@@ -137,7 +137,7 @@ export class GoogleFlightsService {
                 });
 
                 if (!flights) {
-                    throw new Error('Failed to extract flight information');
+                    throw new Error(`Failed to extract flight information for ${url}`);
                 }
 
                 const commonInfo = await page.evaluate(() => {
@@ -157,7 +157,7 @@ export class GoogleFlightsService {
                 });
 
                 if (!commonInfo) {
-                    throw new Error('Failed to extract flight details');
+                    throw new Error(`Failed to extract flight details for ${url}`);
                 }
 
                 await browser.close();
@@ -177,7 +177,8 @@ export class GoogleFlightsService {
             }
         }
 
-        throw new Error(`Failed to fetch flight prices after ${retries} attempts. Last error: ${lastError?.message}`);
+        throw new Error(`Failed to fetch flight prices after ${retries} attempts. Last error: ${lastError?.message}
+            url: ${url}`);
     }
 
     static async testRun(): Promise<void> {
