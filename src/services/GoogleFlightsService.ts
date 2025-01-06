@@ -171,7 +171,7 @@ export class GoogleFlightsService {
                             airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
                             stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
                             stopDetails,
-                            price: parseInt(row.querySelector('.YMlIz.FpEdX.jLMuyc span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
+                            price: parseInt(row.querySelector('.YMlIz.FpEdX span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
                             emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
                         };
                     });
