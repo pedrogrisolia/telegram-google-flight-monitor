@@ -299,10 +299,19 @@ export class TelegramService {
                 return;
             }
 
-            const message = "Your active flight monitors:\n\n" +
-                flights.map((flight, index) => this.formatFlightMessage(flight, index)).join('\n\n');
+            // Send initial message
+            await this.bot.sendMessage(chatId, `You have ${flights.length} active flight monitors:`);
 
-            await this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });  // Enable markdown parsing for hyperlinks
+            // Split flights into groups of 5
+            const FLIGHTS_PER_MESSAGE = 5;
+            for (let i = 0; i < flights.length; i += FLIGHTS_PER_MESSAGE) {
+                const flightGroup = flights.slice(i, i + FLIGHTS_PER_MESSAGE);
+                const message = flightGroup
+                    .map((flight, index) => this.formatFlightMessage(flight, i + index))
+                    .join('\n\n');
+                
+                await this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+            }
         } catch (error) {
             console.error("Error listing flights:", error);
             await this.bot.sendMessage(chatId, "Sorry, there was an error retrieving your flight monitors.");
