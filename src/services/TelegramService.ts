@@ -121,7 +121,7 @@ export class TelegramService {
             for (const flightInfo of flights) {
                 const flight = new Flight();
                 flight.userId = userId;
-                flight.flightUrl = url;
+                flight.flightUrl = flightInfo.successfulUrl || url;  // Store the successful URL
                 flight.origin = flightInfo.origin;
                 flight.destination = flightInfo.destination;
                 flight.date = flightInfo.date;
@@ -140,7 +140,8 @@ export class TelegramService {
             await this.bot.sendMessage(chatId,
                 "✅ Flight monitoring has been set up! Monitoring these flights:\n\n" +
                 flights.map((flight, index) => this.formatFlightMessage(flight, index)).join('\n\n') +
-                "\nI'll notify you when any of these prices change!"
+                "\nI'll notify you when any of these prices change!",
+                { parse_mode: "Markdown" }  // Enable markdown parsing for hyperlinks
             );
         } catch (error) {
             console.error("Error setting up flight monitoring:", error);
@@ -243,6 +244,7 @@ export class TelegramService {
     private async notifyPriceChange(oldFlight: Flight, newFlightInfo: FlightDetails) {
         try {
             const priceChange = newFlightInfo.price - oldFlight.currentPrice;
+            const percentageChange = ((priceChange / oldFlight.currentPrice) * 100).toFixed(1);
             console.log(`Notifying user ${oldFlight.userId} about price ${priceChange > 0 ? 'increase' : 'decrease'} for flight ${oldFlight.id}`);
             
             const changeSymbol = priceChange > 0 ? "📈" : "📉";
@@ -256,9 +258,11 @@ export class TelegramService {
                 `Time: ${oldFlight.departureTime} - ${oldFlight.arrivalTime}\n` +
                 `Duration: ${oldFlight.duration}\n` +
                 `Stops: ${oldFlight.stops}\n\n` +
-                `The price has ${changeText} by R$ ${Math.abs(priceChange).toFixed(2)}\n` +
+                `The price has ${changeText} by R$ ${Math.abs(priceChange).toFixed(2)} (${Math.abs(Number(percentageChange))}%)\n` +
                 `New price: R$ ${newFlightInfo.price.toFixed(2)}\n` +
-                `Previous price: R$ ${oldFlight.currentPrice.toFixed(2)}`
+                `Previous price: R$ ${oldFlight.currentPrice.toFixed(2)}\n` +
+                `[View flight on Google](${oldFlight.flightUrl})`,
+                { parse_mode: "Markdown" }  // Enable markdown parsing for hyperlinks
             );
 
             // Update flight information in database
@@ -298,7 +302,7 @@ export class TelegramService {
             const message = "Your active flight monitors:\n\n" +
                 flights.map((flight, index) => this.formatFlightMessage(flight, index)).join('\n\n');
 
-            await this.bot.sendMessage(chatId, message);
+            await this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });  // Enable markdown parsing for hyperlinks
         } catch (error) {
             console.error("Error listing flights:", error);
             await this.bot.sendMessage(chatId, "Sorry, there was an error retrieving your flight monitors.");
@@ -327,6 +331,13 @@ export class TelegramService {
         }
         
         message += `Current price: R$ ${('price' in flight ? flight.price : flight.currentPrice).toFixed(2)}`;
+
+        // Add hyperlinked URL
+        const url = 'successfulUrl' in flight ? flight.successfulUrl : 
+                   'flightUrl' in flight ? flight.flightUrl : null;
+        if (url) {
+            message += `\n[View flight on Google](${url})`;
+        }
         
         return message;
     }

@@ -18,6 +18,7 @@ export interface FlightDetails {
     stops: string;
     stopDetails?: StopDetails[];
     emissions: string;
+    successfulUrl?: string;
 }
 
 export class GoogleFlightsService {
@@ -58,13 +59,12 @@ export class GoogleFlightsService {
         }
     }
 
-    static cleanUrl(url: string): string {
-        
-        // Find the 'tfs=' parameter and ensure it has exactly 12 underscores
+    static cleanUrl(url: string, underscoreCount: number = 11): string {
+        // Find the 'tfs=' parameter and ensure it has exactly the specified number of underscores
         const tfsMatch = url.match(/tfs=([^&]*)/);
         if (tfsMatch) {
             const tfsValue = tfsMatch[1];
-            const cleanTfsValue = tfsValue.replace(/_+/g, '_'.repeat(12));
+            const cleanTfsValue = tfsValue.replace(/_+/g, '_'.repeat(underscoreCount));
             url = url.replace(tfsMatch[1], cleanTfsValue);
         }
         
@@ -72,12 +72,38 @@ export class GoogleFlightsService {
     }
 
     static async getFlightPricesFromUrl(url: string, retries = 3): Promise<FlightDetails[]> {
-        url = this.cleanUrl(url);
-        
-        if (!this.validateGoogleFlightsUrl(url)) {
-            throw new Error('Invalid Google Flights URL');
+        // First try with 11 underscores
+        try {
+            const urlWith11 = this.cleanUrl(url, 11);
+            if (!this.validateGoogleFlightsUrl(urlWith11)) {
+                throw new Error('Invalid Google Flights URL');
+            }
+            const results = await this.scrapeFlightPrices(urlWith11, retries);
+            return results.map(result => ({
+                ...result,
+                successfulUrl: urlWith11
+            }));
+        } catch (error11) {
+            console.log("Failed with 11 underscores, trying with 12...");
+            // If that fails, try with 12 underscores
+            try {
+                const urlWith12 = this.cleanUrl(url, 12);
+                if (!this.validateGoogleFlightsUrl(urlWith12)) {
+                    throw new Error('Invalid Google Flights URL');
+                }
+                const results = await this.scrapeFlightPrices(urlWith12, retries);
+                return results.map(result => ({
+                    ...result,
+                    successfulUrl: urlWith12
+                }));
+            } catch (error12) {
+                // If both fail, throw the original error
+                throw error11;
+            }
         }
+    }
 
+    private static async scrapeFlightPrices(url: string, retries: number): Promise<FlightDetails[]> {
         let lastError: Error | null = null;
         
         for (let attempt = 1; attempt <= retries; attempt++) {
