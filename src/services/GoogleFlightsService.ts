@@ -60,11 +60,11 @@ export class GoogleFlightsService {
 
     static cleanUrl(url: string): string {
         
-        // Find the 'tfs=' parameter and ensure it has exactly 11 underscores
+        // Find the 'tfs=' parameter and ensure it has exactly 12 underscores
         const tfsMatch = url.match(/tfs=([^&]*)/);
         if (tfsMatch) {
             const tfsValue = tfsMatch[1];
-            const cleanTfsValue = tfsValue.replace(/_+/g, '_'.repeat(11));
+            const cleanTfsValue = tfsValue.replace(/_+/g, '_'.repeat(12));
             url = url.replace(tfsMatch[1], cleanTfsValue);
         }
         
