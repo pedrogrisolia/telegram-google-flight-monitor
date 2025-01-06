@@ -94,11 +94,10 @@ export class GoogleFlightsService {
 
                 await page.goto(url, { waitUntil: 'networkidle0' });
 
-                const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 })
-                    .catch(() => null);
+                const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
                 
                 if (!mainContent) {
-                    throw new Error('No flight results found');
+                    throw new Error(`No flight results found for ${url}`);
                 }
 
                 // Extract information from the first 4 flights
