@@ -1,11 +1,13 @@
 import { DataSource } from "typeorm";
 import { Flight } from "../entities/Flight";
-import * as path from "path";
 
 export const AppDataSource = new DataSource({
-    type: "sqlite",
-    database: process.env.DB_PATH || path.join(__dirname, "../../data/flights.db"),
+    type: "mysql",
+    url: process.env.MYSQL_URL,
     entities: [Flight],
     synchronize: true,
-    logging: false
+    logging: false,
+    ssl: {
+        rejectUnauthorized: false
+    }
 }); 

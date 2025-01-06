@@ -16,7 +16,8 @@
     "puppeteer": "^19.11.1",
     "typeorm": "^0.3.19",
     "sqlite3": "^5.1.7",
-    "reflect-metadata": "^0.1.13"
+    "reflect-metadata": "^0.1.13",
+    "mysql2": "^3.6.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.5",

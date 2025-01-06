@@ -5,6 +5,7 @@ import * as dotenv from "dotenv";
 import { Flight } from "./entities/Flight";
 import { GoogleFlightsService } from "./services/GoogleFlightsService";
 import * as http from 'http';
+import { BackupService } from './services/BackupService';
 
 dotenv.config();
 
@@ -69,6 +70,9 @@ async function main() {
         const nextRun = job.nextInvocation();
         console.log(`Price checks scheduled to run every ${CHECK_INTERVAL} minutes`);
         console.log(`Next check scheduled for: ${nextRun.toLocaleString()}`);
+
+        // Initialize backup service
+        BackupService.initialize();
     } catch (error: any) {
         console.error("Error starting the application:", error.message);
         if (error.message !== "Failed to connect to database after multiple retries") {
