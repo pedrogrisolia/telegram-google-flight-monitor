@@ -93,7 +93,7 @@ export class GoogleFlightsService {
             await page.goto(url, { waitUntil: 'networkidle0' });
 
             // Wait for flight results
-            const mainContent = await page.waitForSelector('[role="main"]', { timeout: 10000 })
+            const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 })
                 .catch(() => null);
             
             if (!mainContent) {
