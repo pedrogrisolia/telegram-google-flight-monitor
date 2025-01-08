@@ -77,6 +77,39 @@ export class GoogleFlightsService {
         return (tfsMatch[1].match(/_/g) || []).length;
     }
 
+    static changeDateInUrl(url: string, oldDate: string, newDate: string): string {
+        // Extract the tfs parameter
+        const tfsMatch = url.match(/tfs=([^&]*)/);
+        if (!tfsMatch) return url;
+
+        const tfsValue = tfsMatch[1];
+        
+        // Try to decode the base64
+        try {
+            const decoded = Buffer.from(tfsValue, 'base64').toString('binary');
+            
+            // Find the date in the decoded string
+            const datePattern = new RegExp(oldDate.replace(/-/g, '[-]?'));
+            const dateMatch = decoded.match(datePattern);
+            
+            if (dateMatch) {
+                // Replace the date
+                const newDecoded = decoded.replace(dateMatch[0], newDate);
+                // Encode back to base64, remove padding and restore underscores
+                const newTfsValue = Buffer.from(newDecoded, 'binary')
+                    .toString('base64')
+                    .replace(/=+$/, '')  // Remove padding
+                    .replace(/\//g, '_'); // Replace forward slashes with underscores
+                // Replace in URL
+                return url.replace(tfsValue, newTfsValue);
+            }
+        } catch (e) {
+            console.error('Error changing date in URL:', e);
+        }
+        
+        return url;
+    }
+
     static async getFlightPricesFromUrl(url: string, retries = 2): Promise<FlightDetails[]> {
         const underscoreCount = this.countUnderscores(url);
         console.log(`URL has ${underscoreCount} underscores`);

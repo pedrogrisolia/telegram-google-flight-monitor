@@ -25,6 +25,7 @@ export class TelegramService {
         destination?: string;
         date?: string;
         passengers?: number;
+        url?: string;  // Store URL while waiting for date range selection
     }> = new Map();
 
     constructor() {
@@ -91,9 +92,50 @@ export class TelegramService {
             }
 
             const url = msg.link_preview_options.url;
-            await this.setupFlightMonitoring(chatId, userId, url);
-            this.userStates.delete(userId);
+            
+            // Extract date from URL first
+            try {
+                const flights = await GoogleFlightsService.getFlightPricesFromUrl(url);
+                if (flights.length > 0) {
+                    state.url = url;
+                    state.date = flights[0].date;
+                    state.step = "AWAITING_DATE_RANGE";
+                    
+                    // Offer date range options
+                    await this.offerDateRangeOptions(chatId, flights[0].date);
+                } else {
+                    throw new Error("No flights found");
+                }
+            } catch (error) {
+                console.error("Error getting flight info:", error);
+                await this.bot.sendMessage(chatId,
+                    "Sorry, there was an error processing the URL. " +
+                    "Please make sure it's a valid Google Flights URL and try again."
+                );
+                this.userStates.delete(userId);
+            }
         }
+    }
+
+    private async offerDateRangeOptions(chatId: number, date: string) {
+        const keyboard = [
+            [{ text: "Just this date", callback_data: "range_0" }],
+            [{ text: "±1 day", callback_data: "range_1" }],
+            [{ text: "±2 days", callback_data: "range_2" }],
+            [{ text: "±3 days", callback_data: "range_3" }],
+            [{ text: "±4 days", callback_data: "range_4" }],
+            [{ text: "±5 days", callback_data: "range_5" }]
+        ];
+
+        await this.bot.sendMessage(chatId,
+            `I found flights for ${date}.\n` +
+            "Would you like to monitor nearby dates as well?",
+            {
+                reply_markup: {
+                    inline_keyboard: keyboard
+                }
+            }
+        );
     }
 
     private async handleCallbackQuery(query: TelegramBot.CallbackQuery) {
@@ -105,44 +147,90 @@ export class TelegramService {
         if (query.data.startsWith('stop_')) {
             const flightId = parseInt(query.data.split('_')[1]);
             await this.stopMonitoring(chatId, userId, flightId);
+        } else if (query.data.startsWith('range_')) {
+            const state = this.userStates.get(userId);
+            if (!state || !state.url || !state.date || state.step !== "AWAITING_DATE_RANGE") return;
+
+            const range = parseInt(query.data.split('_')[1]);
+            await this.setupFlightMonitoringWithRange(chatId, userId, state.url, state.date, range);
+            this.userStates.delete(userId);
         }
     }
 
-    private async setupFlightMonitoring(
+    private async setupFlightMonitoringWithRange(
         chatId: number,
         userId: number,
-        url: string
+        url: string,
+        date: string,
+        range: number
     ) {
         try {
-            await this.bot.sendMessage(chatId, "Fetching flight information...");
+            await this.bot.sendMessage(chatId, `Setting up flight monitoring for ${range === 0 ? 'selected date' : `±${range} days`}...`);
             
-            const flights = await GoogleFlightsService.getFlightPricesFromUrl(url);
+            const dates = [];
+            // Add the original date
+            dates.push(date);
             
-            for (const flightInfo of flights) {
-                const flight = new Flight();
-                flight.userId = userId;
-                flight.flightUrl = flightInfo.successfulUrl || url;  // Store the successful URL
-                flight.origin = flightInfo.origin;
-                flight.destination = flightInfo.destination;
-                flight.date = flightInfo.date;
-                flight.departureTime = flightInfo.departureTime;
-                flight.arrivalTime = flightInfo.arrivalTime;
-                flight.duration = flightInfo.duration;
-                flight.airline = flightInfo.airline;
-                flight.stops = flightInfo.stops;
-                flight.currentPrice = flightInfo.price;
-                flight.isActive = true;
-                flight.passengers = 1;  // Default value
-
-                await AppDataSource.manager.save(flight);
+            // Add dates in the range if range > 0
+            if (range > 0) {
+                for (let i = 1; i <= range; i++) {
+                    // Parse the date and add/subtract days
+                    const baseDate = new Date(date);
+                    
+                    // Add i days
+                    const futureDate = new Date(baseDate);
+                    futureDate.setDate(futureDate.getDate() + i);
+                    dates.push(futureDate.toISOString().split('T')[0]);
+                    
+                    // Subtract i days
+                    const pastDate = new Date(baseDate);
+                    pastDate.setDate(pastDate.getDate() - i);
+                    dates.push(pastDate.toISOString().split('T')[0]);
+                }
             }
 
-            await this.bot.sendMessage(chatId,
-                "✅ Flight monitoring has been set up! Monitoring these flights:\n\n" +
-                flights.map((flight, index) => this.formatFlightMessage(flight, index)).join('\n\n') +
-                "\nI'll notify you when any of these prices change!",
-                { parse_mode: "Markdown" }  // Enable markdown parsing for hyperlinks
-            );
+            // Monitor each date
+            let successCount = 0;
+            for (const targetDate of dates) {
+                try {
+                    const dateUrl = GoogleFlightsService.changeDateInUrl(url, date, targetDate);
+                    const flights = await GoogleFlightsService.getFlightPricesFromUrl(dateUrl);
+                    
+                    for (const flightInfo of flights) {
+                        const flight = new Flight();
+                        flight.userId = userId;
+                        flight.flightUrl = flightInfo.successfulUrl || dateUrl;
+                        flight.origin = flightInfo.origin;
+                        flight.destination = flightInfo.destination;
+                        flight.date = flightInfo.date;
+                        flight.departureTime = flightInfo.departureTime;
+                        flight.arrivalTime = flightInfo.arrivalTime;
+                        flight.duration = flightInfo.duration;
+                        flight.airline = flightInfo.airline;
+                        flight.stops = flightInfo.stops;
+                        flight.currentPrice = flightInfo.price;
+                        flight.isActive = true;
+                        flight.passengers = 1;
+
+                        await AppDataSource.manager.save(flight);
+                        successCount++;
+                    }
+                } catch (error) {
+                    console.error(`Error monitoring date ${targetDate}:`, error);
+                }
+            }
+
+            if (successCount > 0) {
+                await this.bot.sendMessage(chatId,
+                    `✅ Successfully set up monitoring for ${successCount} flights across ${dates.length} dates!\n` +
+                    "I'll notify you when any prices change."
+                );
+            } else {
+                await this.bot.sendMessage(chatId,
+                    "Sorry, I couldn't set up monitoring for any of the dates. " +
+                    "Please try again with a different date range."
+                );
+            }
         } catch (error) {
             console.error("Error setting up flight monitoring:", error);
             await this.bot.sendMessage(chatId,
