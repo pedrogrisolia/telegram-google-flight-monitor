@@ -310,7 +310,7 @@ export class TelegramService {
         if (minPrice !== maxPrice) {
             message += ` - R$ ${maxPrice.toFixed(2)}`;
         }
-        message += `\n[View flight on Google](${firstFlight.flightUrl})`;
+        message += `\n[View ${flights.length > 1 ? 'flights' : 'flight'} on Google](${firstFlight.flightUrl})`;
         
         return message;
     }
