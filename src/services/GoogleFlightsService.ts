@@ -210,8 +210,16 @@ export class GoogleFlightsService {
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-extensions',
                     '--lang=pt-BR'
-                ]
+                ],
+                ignoreDefaultArgs: ['--disable-extensions'],
+                timeout: 30000
             });
 
             try {
