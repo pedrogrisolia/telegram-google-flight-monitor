@@ -83,7 +83,7 @@ export class TelegramService {
         if (!state) return;
 
         if (state.step === "AWAITING_URL") {
-            if (!msg.link_preview_options?.url) {
+            if (!msg.link_preview_options?.url || !msg.link_preview_options?.url.includes("https://www.google.com/travel/flights/search?tfs=")) {
                 await this.bot.sendMessage(chatId, 
                     "Please send a valid Google Flights URL.\n" +
                     "Make sure you're copying the entire URL from your browser."
@@ -92,7 +92,7 @@ export class TelegramService {
             }
 
             const url = msg.link_preview_options.url;
-            
+            this.bot.sendMessage(chatId, `Processing URL: ${url}`);
             // Extract date from URL first
             try {
                 const flights = await GoogleFlightsService.getFlightPricesFromUrl(url);
@@ -157,6 +157,43 @@ export class TelegramService {
         }
     }
 
+    private parseBrazilianDate(dateStr: string): Date {
+        // Convert Brazilian date format (e.g., "sex., 6 de jun.") to a Date object
+        const months: { [key: string]: number } = {
+            'jan': 0, 'fev': 1, 'mar': 2, 'abr': 3, 'mai': 4, 'jun': 5,
+            'jul': 6, 'ago': 7, 'set': 8, 'out': 9, 'nov': 10, 'dez': 11
+        };
+
+        // Extract day and month from the string
+        const match = dateStr.match(/(\d+)\s+de\s+(\w+)/);
+        if (!match) throw new Error(`Invalid date format: ${dateStr}`);
+
+        const day = parseInt(match[1]);
+        const monthStr = match[2].toLowerCase().slice(0, 3);
+        const month = months[monthStr];
+        if (month === undefined) throw new Error(`Invalid month: ${monthStr}`);
+
+        // Use the year from the URL or default to next occurrence of this date
+        const now = new Date();
+        const year = now.getFullYear();
+        const date = new Date(year, month, day);
+
+        // If the date is in the past, use next year
+        if (date < now) {
+            date.setFullYear(year + 1);
+        }
+
+        return date;
+    }
+
+    private formatDateForUrl(date: Date): string {
+        // Format date as YYYY-MM-DD
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     private async setupFlightMonitoringWithRange(
         chatId: number,
         userId: number,
@@ -167,33 +204,37 @@ export class TelegramService {
         try {
             await this.bot.sendMessage(chatId, `Setting up flight monitoring for ${range === 0 ? 'selected date' : `±${range} days`}...`);
             
+            // Parse the original date
+            const baseDate = this.parseBrazilianDate(date);
+            const baseDateStr = this.formatDateForUrl(baseDate);
+            
             const dates = [];
             // Add the original date
-            dates.push(date);
+            dates.push(baseDateStr);
             
             // Add dates in the range if range > 0
             if (range > 0) {
                 for (let i = 1; i <= range; i++) {
-                    // Parse the date and add/subtract days
-                    const baseDate = new Date(date);
-                    
                     // Add i days
                     const futureDate = new Date(baseDate);
-                    futureDate.setDate(futureDate.getDate() + i);
-                    dates.push(futureDate.toISOString().split('T')[0]);
+                    futureDate.setDate(baseDate.getDate() + i);
+                    dates.push(this.formatDateForUrl(futureDate));
                     
                     // Subtract i days
                     const pastDate = new Date(baseDate);
-                    pastDate.setDate(pastDate.getDate() - i);
-                    dates.push(pastDate.toISOString().split('T')[0]);
+                    pastDate.setDate(baseDate.getDate() - i);
+                    dates.push(this.formatDateForUrl(pastDate));
                 }
             }
+
+            // Sort dates chronologically
+            dates.sort();
 
             // Monitor each date
             let successCount = 0;
             for (const targetDate of dates) {
                 try {
-                    const dateUrl = GoogleFlightsService.changeDateInUrl(url, date, targetDate);
+                    const dateUrl = GoogleFlightsService.changeDateInUrl(url, baseDateStr, targetDate);
                     const flights = await GoogleFlightsService.getFlightPricesFromUrl(dateUrl);
                     
                     for (const flightInfo of flights) {
