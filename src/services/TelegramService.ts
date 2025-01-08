@@ -297,6 +297,24 @@ export class TelegramService {
         await this.stopMonitoring(chatId, userId);
     }
 
+    private formatTripMessage(flights: Flight[], tripIndex: number): string {
+        const firstFlight = flights[0];
+        const prices = flights.map(f => f.currentPrice);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        let message = `Trip ${tripIndex + 1}:\n`;
+        message += `${firstFlight.origin} → ${firstFlight.destination}\n`;
+        message += `${firstFlight.date}\n`;
+        message += `Current Prices (${flights.length} flights): R$ ${minPrice.toFixed(2)}`;
+        if (minPrice !== maxPrice) {
+            message += ` - R$ ${maxPrice.toFixed(2)}`;
+        }
+        message += `\n[View flight on Google](${firstFlight.flightUrl})`;
+        
+        return message;
+    }
+
     private async handleListCommand(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
@@ -312,15 +330,26 @@ export class TelegramService {
                 return;
             }
 
-            // Send initial message
-            await this.bot.sendMessage(chatId, `You have ${flights.length} active flight monitors:`);
+            // Group flights by URL
+            const flightsByUrl = new Map<string, Flight[]>();
+            flights.forEach(flight => {
+                const existingFlights = flightsByUrl.get(flight.flightUrl) || [];
+                existingFlights.push(flight);
+                flightsByUrl.set(flight.flightUrl, existingFlights);
+            });
 
-            // Split flights into groups of 5
-            const FLIGHTS_PER_MESSAGE = 5;
-            for (let i = 0; i < flights.length; i += FLIGHTS_PER_MESSAGE) {
-                const flightGroup = flights.slice(i, i + FLIGHTS_PER_MESSAGE);
-                const message = flightGroup
-                    .map((flight, index) => this.formatFlightMessage(flight, i + index))
+            // Convert to array of trips
+            const trips = Array.from(flightsByUrl.values());
+
+            // Send initial message
+            await this.bot.sendMessage(chatId, `You have ${trips.length} monitored trips:`);
+
+            // Split trips into groups of 10 (since they're more concise now)
+            const TRIPS_PER_MESSAGE = 10;
+            for (let i = 0; i < trips.length; i += TRIPS_PER_MESSAGE) {
+                const tripGroup = trips.slice(i, i + TRIPS_PER_MESSAGE);
+                const message = tripGroup
+                    .map((flights, index) => this.formatTripMessage(flights, i + index))
                     .join('\n\n');
                 
                 await this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
