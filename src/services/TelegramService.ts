@@ -97,7 +97,7 @@ export class TelegramService {
             try {
                 const flights = await GoogleFlightsService.getFlightPricesFromUrl(url);
                 if (flights.length > 0) {
-                    state.url = url;
+                    state.url = flights[0].successfulUrl;
                     state.date = flights[0].date;
                     state.step = "AWAITING_DATE_RANGE";
                     
