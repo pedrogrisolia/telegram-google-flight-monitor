@@ -302,20 +302,31 @@ export class TelegramService {
 
     async checkPriceUpdates() {
         try {
+            console.log("Starting price check for all active trips...");
+            
             // Get all active trips
             const activeTrips = await AppDataSource.manager.find(Trip, {
                 where: { isActive: true },
                 relations: ['flights']
             });
+            console.log(`Found ${activeTrips.length} active trips to check`);
 
             for (const trip of activeTrips) {
                 try {
+                    console.log(`\nChecking trip ID ${trip.id}: ${trip.flights[0].origin} → ${trip.flights[0].destination} (${trip.date})`);
+                    console.log(`URL: ${trip.url}`);
+                    
                     // Get current lowest price for the trip
                     const oldLowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
+                    console.log(`Current lowest price: R$ ${oldLowestPrice}`);
 
                     // Fetch new prices
+                    console.log("Fetching new prices from Google Flights...");
                     const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url);
+                    console.log(`Found ${newFlights.length} flights`);
+                    
                     const newLowestPrice = Math.min(...newFlights.map(f => f.price));
+                    console.log(`New lowest price: R$ ${newLowestPrice}`);
 
                     // Update all flight prices in database
                     for (const flight of trip.flights) {
@@ -331,6 +342,7 @@ export class TelegramService {
                         }
                     }
                     await AppDataSource.manager.save(trip.flights);
+                    console.log("Updated flight prices in database");
 
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
@@ -339,6 +351,7 @@ export class TelegramService {
 
                     // Notify if lowest price changed by 5% or more
                     if (absolutePercentageChange >= 5) {
+                        console.log(`Significant price change detected: ${percentageChange}% (R$ ${priceChange})`);
                         const message = `${priceChange > 0 ? '📈' : '📉'} Lowest fare update!\n\n` +
                             `${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
                             `Date: ${trip.date}\n\n` +
@@ -358,6 +371,8 @@ export class TelegramService {
                     console.error(`Failed to check prices for trip ${trip.id}:`, error);
                 }
             }
+            
+            console.log("\nPrice check completed");
         } catch (error) {
             console.error('Error in checkPriceUpdates:', error);
         }
