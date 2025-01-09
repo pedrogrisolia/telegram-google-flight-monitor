@@ -224,7 +224,7 @@ export class GoogleFlightsService {
 
                 // Extract information from the first 4 flights
                 const flights = await page.evaluate(() => {
-                    const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
+                    const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 5);
                     
                     if (flightRows.length === 0) {
                         return null;

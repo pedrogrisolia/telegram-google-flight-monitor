@@ -2,7 +2,6 @@ import { AppDataSource } from "./config/database";
 import { TelegramService } from "./services/TelegramService";
 import * as schedule from "node-schedule";
 import * as dotenv from "dotenv";
-import { GoogleFlightsService } from "./services/GoogleFlightsService";
 import * as http from 'http';
 import { BackupService } from './services/BackupService';
 import { Trip } from "./entities/Trip";
@@ -56,11 +55,13 @@ async function main() {
         });
         console.log(`Currently monitoring ${activeTrips} active trips`);
 
-        await GoogleFlightsService.testRun();
-
         // Initialize Telegram bot service
         const telegramService = new TelegramService();
         console.log("Telegram bot service initialized");
+
+        // Run initial price check
+        await telegramService.checkPriceUpdates();
+        console.log("Initial price check completed");
 
         // Schedule price checks
         const job = schedule.scheduleJob(`*/${CHECK_INTERVAL} * * * *`, async () => {
@@ -94,4 +95,4 @@ process.on('SIGTERM', () => {
 main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
-}); 
+});

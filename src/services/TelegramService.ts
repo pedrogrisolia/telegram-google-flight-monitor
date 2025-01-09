@@ -324,25 +324,19 @@ export class TelegramService {
                     console.log("Fetching new prices from Google Flights...");
                     const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url);
                     console.log(`Found ${newFlights.length} flights`);
-                    
+
                     const newLowestPrice = Math.min(...newFlights.map(f => f.price));
                     console.log(`New lowest price: R$ ${newLowestPrice}`);
 
-                    // Update all flight prices in database
-                    for (const flight of trip.flights) {
-                        const matchingNewFlight = newFlights.find(newFlight => 
-                            newFlight.departureTime === flight.departureTime &&
-                            newFlight.arrivalTime === flight.arrivalTime &&
-                            newFlight.airline === flight.airline
-                        );
-
-                        if (matchingNewFlight) {
-                            flight.previousPrice = flight.currentPrice;
-                            flight.currentPrice = matchingNewFlight.price;
-                        }
-                    }
+                    trip.flights = trip.flights.map((flight, i) => ({
+                        ...newFlights[i],
+                        ...flight,
+                        previousPrice: flight.currentPrice,
+                        currentPrice: newFlights[i].price
+                    }))
+   
                     const savedFlights = await AppDataSource.manager.save(trip.flights);
-                    console.log(`Updated flight prices in database: ${savedFlights}`);
+                    console.log(`Updated flight prices in database: ${JSON.stringify(savedFlights)}`);
 
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
