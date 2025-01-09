@@ -334,6 +334,7 @@ export class TelegramService {
                         previousPrice: flight.currentPrice,
                         currentPrice: newFlights[i].price
                     }))
+                    console.log(JSON.stringify(trip.flights, null, 1));
    
                     const savedFlights = await AppDataSource.manager.save(trip.flights);
                     console.log(`Updated flight prices in database: ${JSON.stringify(savedFlights)}`);
