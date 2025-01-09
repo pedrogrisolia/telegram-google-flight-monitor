@@ -329,10 +329,15 @@ export class TelegramService {
                     console.log(`New lowest price: R$ ${newLowestPrice}`);
 
                     trip.flights = trip.flights.map((flight, i) => ({
-                        ...newFlights[i],
                         ...flight,
+                        currentPrice: newFlights[i].price,
                         previousPrice: flight.currentPrice,
-                        currentPrice: newFlights[i].price
+                        stopDetails: newFlights[i].stopDetails,
+                        departureTime: newFlights[i].departureTime,
+                        arrivalTime: newFlights[i].arrivalTime,
+                        duration: newFlights[i].duration,
+                        airline: newFlights[i].airline,
+                        stops: newFlights[i].stops
                     }))
                     console.log(JSON.stringify(trip.flights, null, 1));
    
