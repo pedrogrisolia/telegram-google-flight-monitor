@@ -7,7 +7,6 @@ export const AppDataSource = new DataSource({
     type: "mysql",
     url: process.env.MYSQL_URL,
     synchronize: true,
-    logging: true,
     entities: [User, Trip, Flight],
     ssl: {
         rejectUnauthorized: false
