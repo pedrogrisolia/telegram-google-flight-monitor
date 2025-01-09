@@ -20,7 +20,7 @@ export class Trip {
     date!: string;
 
     @Column({ default: true })
-    isActive: boolean = true;
+    isActive!: boolean;
 
     @CreateDateColumn()
     createdAt!: Date;
@@ -29,5 +29,5 @@ export class Trip {
     updatedAt!: Date;
 
     @OneToMany(() => Flight, flight => flight.trip, { cascade: true })
-    flights: Flight[] = [];
+    flights!: Flight[];
 } 

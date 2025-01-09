@@ -12,7 +12,7 @@ export class Flight {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @ManyToOne(() => Trip, trip => trip.flights)
+    @ManyToOne(() => Trip, trip => trip.flights, { onDelete: 'CASCADE' })
     trip!: Trip;
 
     @Column()
@@ -43,7 +43,7 @@ export class Flight {
     previousPrice?: number;
 
     @Column({ default: 1 })
-    passengers: number = 1;
+    passengers!: number;
 
     @Column("simple-json", { nullable: true })
     stopDetails?: StopDetails[];

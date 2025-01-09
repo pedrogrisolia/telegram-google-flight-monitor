@@ -7,5 +7,5 @@ export class User {
     id!: number;
 
     @OneToMany(() => Trip, trip => trip.user)
-    trips: Trip[] = [];
+    trips!: Trip[];
 } 
