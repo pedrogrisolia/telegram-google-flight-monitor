@@ -328,21 +328,22 @@ export class TelegramService {
                     const newLowestPrice = Math.min(...newFlights.map(f => f.price));
                     console.log(`New lowest price: R$ ${newLowestPrice}`);
 
-                    trip.flights = trip.flights.map((flight, i) => ({
-                        ...flight,
-                        currentPrice: newFlights[i].price,
-                        previousPrice: flight.currentPrice,
-                        stopDetails: newFlights[i].stopDetails,
-                        departureTime: newFlights[i].departureTime,
-                        arrivalTime: newFlights[i].arrivalTime,
-                        duration: newFlights[i].duration,
-                        airline: newFlights[i].airline,
-                        stops: newFlights[i].stops
-                    }))
-                    console.log(JSON.stringify(trip.flights, null, 1));
-   
-                    const savedFlights = await AppDataSource.manager.save(trip.flights);
-                    console.log(`Updated flight prices in database: ${JSON.stringify(savedFlights)}`);
+                    // Update existing flights with new data
+                    for (let i = 0; i < trip.flights.length; i++) {
+                        if (newFlights[i]) {
+                            trip.flights[i].previousPrice = trip.flights[i].currentPrice;
+                            trip.flights[i].currentPrice = newFlights[i].price;
+                            trip.flights[i].stopDetails = newFlights[i].stopDetails;
+                            trip.flights[i].departureTime = newFlights[i].departureTime;
+                            trip.flights[i].arrivalTime = newFlights[i].arrivalTime;
+                            trip.flights[i].duration = newFlights[i].duration;
+                            trip.flights[i].airline = newFlights[i].airline;
+                            trip.flights[i].stops = newFlights[i].stops;
+                        }
+                    }
+
+                    const savedFligths = await AppDataSource.manager.save(trip.flights);
+                    console.log(`Updated ${savedFligths.length} flights in database`);
 
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
