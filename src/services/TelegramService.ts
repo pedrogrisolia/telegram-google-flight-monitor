@@ -363,7 +363,7 @@ export class TelegramService {
                             `━━━━━━━━━━━━━━━\n` +
                             `${trend} by:\n` +
                             `💰 R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n\n` +
-                            `*Previous Price:* R$ ${oldLowestPrice}\n` +
+                            `*Previous Price:* ~R$ ${oldLowestPrice}~\n` +
                             `*Current Price:* R$ ${newLowestPrice}\n` +
                             `━━━━━━━━━━━━━━━\n` +
                             `[🔍 View on Google Flights](${trip.url})`;
@@ -413,10 +413,11 @@ export class TelegramService {
                 const message = tripGroup
                     .map((trip, index) => {
                         const lowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
-                        return `${i + index + 1}. ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
-                               `   📅 ${trip.date}\n` +
-                               `   💰 Lowest price: R$ ${lowestPrice}\n` +
-                               `   [View flight](${trip.url})`;
+                        return  `*${i + index + 1}.* ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                                `*Date:* ${trip.date}\n` +
+                                `*Lowest price:* R$ ${lowestPrice}\n` +
+                                `━━━━━━━━━━━━━━━\n` +
+                                `[🔍 View on Google Flights](${trip.url})`;
                     })
                     .join('\n\n');
                 
