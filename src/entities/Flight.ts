@@ -1,25 +1,25 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
-import { StopDetails } from "../services/GoogleFlightsService";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from "typeorm";
+import { Trip } from "./Trip";
+
+export interface StopDetails {
+    airport: string;
+    airportName: string;
+    duration: string;
+}
 
 @Entity()
 export class Flight {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column()
-    userId!: number;
-
-    @Column()
-    flightUrl!: string;
+    @ManyToOne(() => Trip, trip => trip.flights)
+    trip!: Trip;
 
     @Column()
     origin!: string;
 
     @Column()
     destination!: string;
-
-    @Column()
-    date!: string;
 
     @Column()
     departureTime!: string;
@@ -36,24 +36,15 @@ export class Flight {
     @Column()
     stops!: string;
 
-    @Column()
+    @Column("float")
     currentPrice!: number;
 
-    @Column({ nullable: true })
+    @Column("float", { nullable: true })
     previousPrice?: number;
 
-    @Column()
-    passengers!: number;
+    @Column({ default: 1 })
+    passengers: number = 1;
 
-    @Column()
-    isActive!: boolean;
-
-    @CreateDateColumn()
-    createdAt!: Date;
-
-    @UpdateDateColumn()
-    updatedAt!: Date;
-
-    @Column({ type: 'simple-json', nullable: true })
+    @Column("simple-json", { nullable: true })
     stopDetails?: StopDetails[];
 } 

@@ -2,7 +2,9 @@ import TelegramBot from "node-telegram-bot-api";
 import { AppDataSource } from "../config/database";
 import { Flight } from "../entities/Flight";
 import * as dotenv from "dotenv";
-import { FlightDetails, GoogleFlightsService } from "./GoogleFlightsService";
+import { GoogleFlightsService } from "./GoogleFlightsService";
+import { User } from "../entities/User";
+import { Trip } from "../entities/Trip";
 
 dotenv.config();
 
@@ -204,6 +206,14 @@ export class TelegramService {
         try {
             await this.bot.sendMessage(chatId, `Setting up flight monitoring for ${range === 0 ? 'selected date' : `±${range} days`}...`);
             
+            // Create or find user
+            let user = await AppDataSource.manager.findOne(User, { where: { id: userId } });
+            if (!user) {
+                user = new User();
+                user.id = userId;
+                await AppDataSource.manager.save(user);
+            }
+
             // Parse the original date
             const baseDate = this.parseBrazilianDate(date);
             const baseDateStr = this.formatDateForUrl(baseDate);
@@ -237,23 +247,32 @@ export class TelegramService {
                     const dateUrl = GoogleFlightsService.changeDateInUrl(url, baseDateStr, targetDate);
                     const flights = await GoogleFlightsService.getFlightPricesFromUrl(dateUrl);
                     
-                    for (const flightInfo of flights) {
-                        const flight = new Flight();
-                        flight.userId = userId;
-                        flight.flightUrl = flightInfo.successfulUrl || dateUrl;
-                        flight.origin = flightInfo.origin;
-                        flight.destination = flightInfo.destination;
-                        flight.date = flightInfo.date;
-                        flight.departureTime = flightInfo.departureTime;
-                        flight.arrivalTime = flightInfo.arrivalTime;
-                        flight.duration = flightInfo.duration;
-                        flight.airline = flightInfo.airline;
-                        flight.stops = flightInfo.stops;
-                        flight.currentPrice = flightInfo.price;
-                        flight.isActive = true;
-                        flight.passengers = 1;
+                    if (flights.length > 0) {
+                        // Create trip entity
+                        const trip = new Trip();
+                        trip.userId = userId;
+                        trip.url = flights[0].successfulUrl || dateUrl;
+                        trip.date = flights[0].date;
+                        trip.flights = [];
 
-                        await AppDataSource.manager.save(flight);
+                        // Create flight entities
+                        for (const flightInfo of flights) {
+                            const flight = new Flight();
+                            flight.origin = flightInfo.origin;
+                            flight.destination = flightInfo.destination;
+                            flight.departureTime = flightInfo.departureTime;
+                            flight.arrivalTime = flightInfo.arrivalTime;
+                            flight.duration = flightInfo.duration;
+                            flight.airline = flightInfo.airline;
+                            flight.stops = flightInfo.stops;
+                            flight.currentPrice = flightInfo.price;
+                            flight.passengers = 1;
+                            flight.stopDetails = flightInfo.stopDetails;
+                            trip.flights.push(flight);
+                        }
+
+                        // Save trip with flights
+                        await AppDataSource.manager.save(trip);
                         successCount++;
                     }
                 } catch (error) {
@@ -263,8 +282,8 @@ export class TelegramService {
 
             if (successCount > 0) {
                 await this.bot.sendMessage(chatId,
-                    `✅ Successfully set up monitoring for ${successCount} flights across ${dates.length} dates!\n` +
-                    "I'll notify you when any prices change."
+                    `✅ Successfully set up monitoring for ${successCount} trips!\n` +
+                    "I'll notify you when the lowest price for any trip changes by 5% or more."
                 );
             } else {
                 await this.bot.sendMessage(chatId,
@@ -281,167 +300,67 @@ export class TelegramService {
         }
     }
 
-    private async stopMonitoring(chatId: number, userId: number, flightId?: number) {
-        try {
-            if (flightId) {
-                // Stop specific flight
-                const flight = await AppDataSource.manager.findOne(Flight, { 
-                    where: { id: flightId, userId: userId }
-                });
-                
-                if (flight) {
-                    flight.isActive = false;
-                    await AppDataSource.manager.save(flight);
-                    await this.bot.sendMessage(chatId, "Flight monitoring stopped successfully!");
-                }
-            } else {
-                // Show list of flights to stop
-                const flights = await AppDataSource.manager.find(Flight, {
-                    where: { userId, isActive: true }
-                });
-
-                if (flights.length === 0) {
-                    await this.bot.sendMessage(chatId, "You don't have any active flight monitors.");
-                    return;
-                }
-
-                const keyboard = flights.map(flight => [{
-                    text: `${flight.origin} → ${flight.destination} (${flight.date})`,
-                    callback_data: `stop_${flight.id}`
-                }]);
-
-                await this.bot.sendMessage(chatId,
-                    "Select the flight monitor you want to stop:",
-                    {
-                        reply_markup: {
-                            inline_keyboard: keyboard
-                        }
-                    }
-                );
-            }
-        } catch (error) {
-            console.error("Error stopping flight monitoring:", error);
-            await this.bot.sendMessage(chatId, "Sorry, there was an error processing your request.");
-        }
-    }
-
     async checkPriceUpdates() {
         try {
-            const activeFlights = await AppDataSource.manager.find(Flight, {
-                where: { isActive: true }
-            });
-            console.log(`Starting price check for ${activeFlights.length} active flights...`);
-
-            // Group flights by URL to avoid multiple requests to the same URL
-            const flightsByUrl = new Map<string, Flight[]>();
-            activeFlights.forEach(flight => {
-                const flights = flightsByUrl.get(flight.flightUrl) || [];
-                flights.push(flight);
-                flightsByUrl.set(flight.flightUrl, flights);
+            // Get all active trips
+            const activeTrips = await AppDataSource.manager.find(Trip, {
+                where: { isActive: true },
+                relations: ['flights']
             });
 
-            for (const [url, flights] of flightsByUrl) {
-                console.log(`Checking prices for URL: ${url} (${flights.length} flights)`);
-                const currentFlights = await GoogleFlightsService.getFlightPricesFromUrl(url);
-                
-                // If we got a different successful URL, update all flights with this URL
-                const successfulUrl = currentFlights[0]?.successfulUrl;
-                if (successfulUrl && successfulUrl !== url) {
-                    console.log(`Updating URL for ${flights.length} flights from ${url} to ${successfulUrl}`);
-                    for (const flight of flights) {
-                        flight.flightUrl = successfulUrl;
-                    }
-                }
-                
-                for (const flight of flights) {
-                    const updatedFlight = currentFlights.find(f => 
-                        f.departureTime === flight.departureTime && 
-                        f.arrivalTime === flight.arrivalTime &&
-                        f.airline === flight.airline
-                    );
+            for (const trip of activeTrips) {
+                try {
+                    // Get current lowest price for the trip
+                    const oldLowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
 
-                    if (!updatedFlight) {
-                        console.log(`Flight not found: ${flight.airline} ${flight.departureTime}-${flight.arrivalTime}`);
-                        continue;
-                    }
+                    // Fetch new prices
+                    const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url);
+                    const newLowestPrice = Math.min(...newFlights.map(f => f.price));
 
-                    if (updatedFlight.price !== flight.currentPrice) {
-                        console.log(`Price change detected for flight ${flight.id}: ${flight.currentPrice} -> ${updatedFlight.price}`);
-                        await this.notifyPriceChange(flight, updatedFlight);
-                    } else {
-                        console.log(`No price change for flight ${flight.id}: ${flight.currentPrice}`);
-                        // Even if price didn't change, save the flight if URL was updated
-                        if (successfulUrl && successfulUrl !== url) {
-                            await AppDataSource.manager.save(flight);
+                    // Update all flight prices in database
+                    for (const flight of trip.flights) {
+                        const matchingNewFlight = newFlights.find(newFlight => 
+                            newFlight.departureTime === flight.departureTime &&
+                            newFlight.arrivalTime === flight.arrivalTime &&
+                            newFlight.airline === flight.airline
+                        );
+
+                        if (matchingNewFlight) {
+                            flight.previousPrice = flight.currentPrice;
+                            flight.currentPrice = matchingNewFlight.price;
                         }
                     }
+                    await AppDataSource.manager.save(trip.flights);
+
+                    // Calculate price change percentage
+                    const priceChange = newLowestPrice - oldLowestPrice;
+                    const percentageChange = ((priceChange / oldLowestPrice) * 100).toFixed(1);
+                    const absolutePercentageChange = Math.abs(Number(percentageChange));
+
+                    // Notify if lowest price changed by 5% or more
+                    if (absolutePercentageChange >= 5) {
+                        const message = `${priceChange > 0 ? '📈' : '📉'} Lowest fare update!\n\n` +
+                            `${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                            `Date: ${trip.date}\n\n` +
+                            `Price has ${priceChange > 0 ? 'increased' : 'decreased'} by ` +
+                            `R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n` +
+                            `New lowest price: R$ ${newLowestPrice}\n\n` +
+                            `[View flight](${trip.url})`;
+
+                        await this.bot.sendMessage(trip.userId, message, {
+                            parse_mode: 'Markdown',
+                            disable_web_page_preview: true
+                        });
+
+                        console.log(`Notified user ${trip.userId} about lowest price change for trip ${trip.flights[0].origin} to ${trip.flights[0].destination} on ${trip.date}`);
+                    }
+                } catch (error) {
+                    console.error(`Failed to check prices for trip ${trip.id}:`, error);
                 }
             }
-            console.log('Price check completed successfully');
         } catch (error) {
-            console.error("Error checking price updates:", error);
+            console.error('Error in checkPriceUpdates:', error);
         }
-    }
-
-    private async notifyPriceChange(oldFlight: Flight, newFlightInfo: FlightDetails) {
-        try {
-            const priceChange = newFlightInfo.price - oldFlight.currentPrice;
-            const percentageChange = ((priceChange / oldFlight.currentPrice) * 100).toFixed(1);
-            console.log(`Notifying user ${oldFlight.userId} about price ${priceChange > 0 ? 'increase' : 'decrease'} for flight ${oldFlight.id}`);
-            
-            const changeSymbol = priceChange > 0 ? "📈" : "📉";
-            const changeText = priceChange > 0 ? "increased" : "decreased";
-
-            await this.bot.sendMessage(oldFlight.userId,
-                `${changeSymbol} Price Update for your monitored flight!\n\n` +
-                `${oldFlight.airline}\n` +
-                `${oldFlight.origin} → ${oldFlight.destination}\n` +
-                `Date: ${oldFlight.date}\n` +
-                `Time: ${oldFlight.departureTime} - ${oldFlight.arrivalTime}\n` +
-                `Duration: ${oldFlight.duration}\n` +
-                `Stops: ${oldFlight.stops}\n\n` +
-                `The price has ${changeText} by R$ ${Math.abs(priceChange).toFixed(2)} (${Math.abs(Number(percentageChange))}%)\n` +
-                `New price: R$ ${newFlightInfo.price.toFixed(2)}\n` +
-                `Previous price: R$ ${oldFlight.currentPrice.toFixed(2)}\n` +
-                `[View flight on Google](${oldFlight.flightUrl})`,
-                { parse_mode: "Markdown" }  // Enable markdown parsing for hyperlinks
-            );
-
-            // Update flight information in database
-            oldFlight.previousPrice = oldFlight.currentPrice;
-            oldFlight.currentPrice = newFlightInfo.price;
-            await AppDataSource.manager.save(oldFlight);
-
-            console.log(`Successfully notified user ${oldFlight.userId} and updated flight ${oldFlight.id} in database`);
-        } catch (error) {
-            console.error(`Failed to notify user ${oldFlight.userId} about price change for flight ${oldFlight.id}:`, error);
-        }
-    }
-
-    private async handleStopCommand(msg: TelegramBot.Message) {
-        const chatId = msg.chat.id;
-        const userId = msg.from?.id;
-        if (!userId) return;
-        
-        await this.stopMonitoring(chatId, userId);
-    }
-
-    private formatTripMessage(flights: Flight[], tripIndex: number): string {
-        const firstFlight = flights[0];
-        const prices = flights.map(f => f.currentPrice);
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        
-        let message = `Trip ${tripIndex + 1}:\n`;
-        message += `${firstFlight.origin} → ${firstFlight.destination}\n`;
-        message += `${firstFlight.date}\n`;
-        message += `Current Prices (${flights.length} flights): R$ ${minPrice.toFixed(2)}`;
-        if (minPrice !== maxPrice) {
-            message += ` - R$ ${maxPrice.toFixed(2)}`;
-        }
-        message += `\n[View ${flights.length > 1 ? 'flights' : 'flight'} on Google](${firstFlight.flightUrl})`;
-        
-        return message;
     }
 
     private async handleListCommand(msg: TelegramBot.Message) {
@@ -450,75 +369,103 @@ export class TelegramService {
         if (!userId) return;
 
         try {
-            const flights = await AppDataSource.manager.find(Flight, {
-                where: { userId, isActive: true }
+            const trips = await AppDataSource.manager.find(Trip, {
+                where: { userId, isActive: true },
+                relations: ['flights'],
+                order: { date: 'ASC' }
             });
 
-            if (flights.length === 0) {
+            if (trips.length === 0) {
                 await this.bot.sendMessage(chatId, "You don't have any active flight monitors.");
                 return;
             }
 
-            // Group flights by URL
-            const flightsByUrl = new Map<string, Flight[]>();
-            flights.forEach(flight => {
-                const existingFlights = flightsByUrl.get(flight.flightUrl) || [];
-                existingFlights.push(flight);
-                flightsByUrl.set(flight.flightUrl, existingFlights);
-            });
-
-            // Convert to array of trips
-            const trips = Array.from(flightsByUrl.values());
-
             // Send initial message
             await this.bot.sendMessage(chatId, `You have ${trips.length} monitored trips:`);
 
-            // Split trips into groups of 10 (since they're more concise now)
+            // Split trips into groups of 10
             const TRIPS_PER_MESSAGE = 10;
             for (let i = 0; i < trips.length; i += TRIPS_PER_MESSAGE) {
                 const tripGroup = trips.slice(i, i + TRIPS_PER_MESSAGE);
                 const message = tripGroup
-                    .map((flights, index) => this.formatTripMessage(flights, i + index))
+                    .map((trip, index) => {
+                        const lowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
+                        return `${i + index + 1}. ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                               `   📅 ${trip.date}\n` +
+                               `   💰 Lowest price: R$ ${lowestPrice}\n` +
+                               `   [View flight](${trip.url})`;
+                    })
                     .join('\n\n');
                 
-                await this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+                await this.bot.sendMessage(chatId, message, {
+                    parse_mode: 'Markdown',
+                    disable_web_page_preview: true
+                });
             }
         } catch (error) {
-            console.error("Error listing flights:", error);
+            console.error("Error listing trips:", error);
             await this.bot.sendMessage(chatId, "Sorry, there was an error retrieving your flight monitors.");
         }
     }
 
-    private formatFlightMessage(flight: Flight | FlightDetails, index?: number): string {
-        let message = '';
-        
-        if (index !== undefined) {
-            message += `Flight ${index + 1}:\n`;
-        }
-        
-        message += `${flight.airline}\n` +
-            `${flight.origin} → ${flight.destination}\n` +
-            `Date: ${flight.date}\n` +
-            `Time: ${flight.departureTime} - ${flight.arrivalTime}\n` +
-            `Duration: ${flight.duration}\n` +
-            `Stops: ${flight.stops}\n`;
-            
-        if (flight.stopDetails && flight.stopDetails.length > 0) {
-            flight.stopDetails.forEach((stop, i) => {
-                message += `Stop ${i + 1}: ${stop.airport} (${stop.airportName})\n` +
-                          `Duration: ${stop.duration}\n`;
-            });
-        }
-        
-        message += `Current price: R$ ${('price' in flight ? flight.price : flight.currentPrice).toFixed(2)}`;
+    private async handleStopCommand(msg: TelegramBot.Message) {
+        const chatId = msg.chat.id;
+        const userId = msg.from?.id;
+        if (!userId) return;
 
-        // Add hyperlinked URL
-        const url = 'successfulUrl' in flight ? flight.successfulUrl : 
-                   'flightUrl' in flight ? flight.flightUrl : null;
-        if (url) {
-            message += `\n[View flight on Google](${url})`;
+        try {
+            const trips = await AppDataSource.manager.find(Trip, {
+                where: { userId, isActive: true },
+                relations: ['flights'],
+                order: { date: 'ASC' }
+            });
+
+            if (trips.length === 0) {
+                await this.bot.sendMessage(chatId, "You don't have any active flight monitors to stop.");
+                return;
+            }
+
+            const keyboard = trips.map((trip, index) => [{
+                text: `${index + 1}. ${trip.flights[0].origin} → ${trip.flights[0].destination} (${trip.date})`,
+                callback_data: `stop_${trip.id}`
+            }]);
+
+            await this.bot.sendMessage(chatId,
+                "Which flight monitor would you like to stop?\n" +
+                "Select from the list below:",
+                {
+                    reply_markup: {
+                        inline_keyboard: keyboard
+                    }
+                }
+            );
+        } catch (error) {
+            console.error("Error listing trips for stop command:", error);
+            await this.bot.sendMessage(chatId, "Sorry, there was an error retrieving your flight monitors.");
         }
-        
-        return message;
+    }
+
+    private async stopMonitoring(chatId: number, userId: number, tripId: number) {
+        try {
+            const trip = await AppDataSource.manager.findOne(Trip, {
+                where: { id: tripId, userId },
+                relations: ['flights']
+            });
+
+            if (!trip) {
+                await this.bot.sendMessage(chatId, "Sorry, I couldn't find that flight monitor.");
+                return;
+            }
+
+            trip.isActive = false;
+            await AppDataSource.manager.save(trip);
+
+            await this.bot.sendMessage(chatId,
+                `✅ Stopped monitoring flights from ${trip.flights[0].origin} to ${trip.flights[0].destination} on ${trip.date}.`
+            );
+        } catch (error) {
+            console.error("Error stopping flight monitor:", error);
+            await this.bot.sendMessage(chatId, "Sorry, there was an error stopping the flight monitor.");
+        }
     }
 } 

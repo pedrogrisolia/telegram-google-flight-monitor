@@ -1,4 +1,4 @@
-import puppeteer, { Page, ElementHandle } from 'puppeteer';
+import puppeteer from 'puppeteer';
 
 export interface StopDetails {
     airport: string;
@@ -22,31 +22,6 @@ export interface FlightDetails {
 }
 
 export class GoogleFlightsService {
-    private static async waitForClickable(page: Page, selector: string, timeout = 5000): Promise<ElementHandle | null> {
-        const element = await page.waitForSelector(selector, { visible: true, timeout });
-        if (!element) return null;
-
-        // Wait for element to be clickable
-        await page.evaluate((el) => {
-            return new Promise<void>((resolve) => {
-                const checkClickable = () => {
-                    const rect = el.getBoundingClientRect();
-                    const isVisible = rect.top >= 0 && rect.left >= 0 &&
-                        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-                        rect.right <= (window.innerWidth || document.documentElement.clientWidth);
-                    
-                    if (isVisible) {
-                        resolve();
-                    } else {
-                        requestAnimationFrame(checkClickable);
-                    }
-                };
-                checkClickable();
-            });
-        }, element);
-
-        return element;
-    }
 
     private static validateGoogleFlightsUrl(url: string): boolean {
         try {

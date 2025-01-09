@@ -2,10 +2,10 @@ import { AppDataSource } from "./config/database";
 import { TelegramService } from "./services/TelegramService";
 import * as schedule from "node-schedule";
 import * as dotenv from "dotenv";
-import { Flight } from "./entities/Flight";
 import { GoogleFlightsService } from "./services/GoogleFlightsService";
 import * as http from 'http';
 import { BackupService } from './services/BackupService';
+import { Trip } from "./entities/Trip";
 
 dotenv.config();
 
@@ -51,10 +51,10 @@ async function main() {
             throw new Error("Failed to connect to database after multiple retries");
         }
 
-        const activeFlights = await AppDataSource.manager.count(Flight, {
+        const activeTrips = await AppDataSource.manager.count(Trip, {
             where: { isActive: true }
         });
-        console.log(`Currently monitoring ${activeFlights} active flights`);
+        console.log(`Currently monitoring ${activeTrips} active trips`);
 
         await GoogleFlightsService.testRun();
 
