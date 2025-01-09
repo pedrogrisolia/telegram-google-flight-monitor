@@ -372,7 +372,7 @@ export class TelegramService {
             const trips = await AppDataSource.manager.find(Trip, {
                 where: { userId, isActive: true },
                 relations: ['flights'],
-                order: { date: 'ASC' }
+                order: { flights: { currentPrice: 'ASC' } }
             });
 
             if (trips.length === 0) {
@@ -417,7 +417,7 @@ export class TelegramService {
             const trips = await AppDataSource.manager.find(Trip, {
                 where: { userId, isActive: true },
                 relations: ['flights'],
-                order: { date: 'ASC' }
+                order: { flights: { currentPrice: 'ASC' } }
             });
 
             if (trips.length === 0) {
