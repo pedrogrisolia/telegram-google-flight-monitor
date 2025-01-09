@@ -341,8 +341,8 @@ export class TelegramService {
                             flight.currentPrice = matchingNewFlight.price;
                         }
                     }
-                    await AppDataSource.manager.save(trip.flights);
-                    console.log("Updated flight prices in database");
+                    const savedFlights = await AppDataSource.manager.save(trip.flights);
+                    console.log(`Updated flight prices in database: ${savedFlights}`);
 
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
