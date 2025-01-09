@@ -352,13 +352,20 @@ export class TelegramService {
                     // Notify if lowest price changed by 5% or more
                     if (absolutePercentageChange >= 5) {
                         console.log(`Significant price change detected: ${percentageChange}% (R$ ${priceChange})`);
-                        const message = `${priceChange > 0 ? '📈' : '📉'} Lowest fare update!\n\n` +
-                            `${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
-                            `Date: ${trip.date}\n\n` +
-                            `Price has ${priceChange > 0 ? 'increased' : 'decreased'} by ` +
-                            `R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n` +
-                            `New lowest price: R$ ${newLowestPrice}\n\n` +
-                            `[View flight](${trip.url})`;
+                        const emoji = priceChange > 0 ? '🔴' : '🟢';
+                        const trend = priceChange > 0 ? '📈 Increased' : '📉 Decreased';
+                        
+                        const message = 
+                            `*Price Alert ${emoji}*\n\n` +
+                            `*Route:* ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                            `*Date:* ${trip.date}\n` +
+                            `━━━━━━━━━━━━━━━\n` +
+                            `${trend} by:\n` +
+                            `💰 R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n\n` +
+                            `*Previous Price:* R$ ${oldLowestPrice}\n` +
+                            `*Current Price:* R$ ${newLowestPrice}\n` +
+                            `━━━━━━━━━━━━━━━\n` +
+                            `[🔍 View on Google Flights](${trip.url})`;
 
                         await this.bot.sendMessage(trip.userId, message, {
                             parse_mode: 'Markdown',
@@ -483,4 +490,4 @@ export class TelegramService {
             await this.bot.sendMessage(chatId, "Sorry, there was an error stopping the flight monitor.");
         }
     }
-} 
+}
