@@ -85,7 +85,7 @@ export class GoogleFlightsService {
         return url;
     }
 
-    static async getFlightPricesFromUrl(url: string, retries = 2): Promise<FlightDetails[]> {
+    static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
         const underscoreCount = this.countUnderscores(url);
         console.log(`URL has ${underscoreCount} underscores`);
 
@@ -96,7 +96,7 @@ export class GoogleFlightsService {
                 if (!this.validateGoogleFlightsUrl(urlWith11)) {
                     throw new Error('Invalid Google Flights URL');
                 }
-                const results = await this.scrapeFlightPrices(urlWith11, retries);
+                const results = await this.scrapeFlightPrices(urlWith11);
                 return results.map(result => ({
                     ...result,
                     successfulUrl: urlWith11
@@ -108,7 +108,7 @@ export class GoogleFlightsService {
                     if (!this.validateGoogleFlightsUrl(urlWith12)) {
                         throw new Error('Invalid Google Flights URL');
                     }
-                    const results = await this.scrapeFlightPrices(urlWith12, retries);
+                    const results = await this.scrapeFlightPrices(urlWith12);
                     return results.map(result => ({
                         ...result,
                         successfulUrl: urlWith12
@@ -125,7 +125,7 @@ export class GoogleFlightsService {
                 if (!this.validateGoogleFlightsUrl(url)) {
                     throw new Error('Invalid Google Flights URL');
                 }
-                const results = await this.scrapeFlightPrices(url, retries);
+                const results = await this.scrapeFlightPrices(url);
                 return results.map(result => ({
                     ...result,
                     successfulUrl: url
@@ -137,7 +137,7 @@ export class GoogleFlightsService {
                     if (!this.validateGoogleFlightsUrl(urlWith12)) {
                         throw new Error('Invalid Google Flights URL');
                     }
-                    const results = await this.scrapeFlightPrices(urlWith12, retries);
+                    const results = await this.scrapeFlightPrices(urlWith12);
                     return results.map(result => ({
                         ...result,
                         successfulUrl: urlWith12
@@ -153,7 +153,7 @@ export class GoogleFlightsService {
             if (!this.validateGoogleFlightsUrl(url)) {
                 throw new Error('Invalid Google Flights URL');
             }
-            const results = await this.scrapeFlightPrices(url, retries);
+            const results = await this.scrapeFlightPrices(url);
             return results.map(result => ({
                 ...result,
                 successfulUrl: url
@@ -165,7 +165,7 @@ export class GoogleFlightsService {
                 if (!this.validateGoogleFlightsUrl(urlWith11)) {
                     throw new Error('Invalid Google Flights URL');
                 }
-                const results = await this.scrapeFlightPrices(urlWith11, retries);
+                const results = await this.scrapeFlightPrices(urlWith11);
                 return results.map(result => ({
                     ...result,
                     successfulUrl: urlWith11
@@ -176,130 +176,135 @@ export class GoogleFlightsService {
         }
     }
 
-    private static async scrapeFlightPrices(url: string, retries: number): Promise<FlightDetails[]> {
+    private static async scrapeFlightPrices(url: string): Promise<FlightDetails[]> {
         let lastError: Error | null = null;
+        const browser = await puppeteer.launch({
+            headless: "new",
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-extensions',
+                '--lang=pt-BR'
+            ],
+            ignoreDefaultArgs: ['--disable-extensions'],
+            timeout: 30000
+        });  
         
-        for (let attempt = 1; attempt <= retries; attempt++) {
-            const browser = await puppeteer.launch({
-                headless: "new",
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-extensions',
-                    '--lang=pt-BR'
-                ],
-                ignoreDefaultArgs: ['--disable-extensions'],
-                timeout: 30000
+        setTimeout(async () => {
+            try {
+                if (browser && browser.isConnected()) {
+                    await browser.close();
+                    console.log('Browser closed by timeout');
+                }
+            } catch (error) {
+                console.error('Error closing browser by timeout:', error);
+            }
+        }, 30000);
+
+        try {
+            const page = await browser.newPage();
+            
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'pt-BR,pt;q=0.9'
             });
 
-            try {
-                console.log(`Attempt ${attempt} of ${retries} to fetch flight prices`);
-                const page = await browser.newPage();
+            await page.setGeolocation({
+                latitude: -23.5505,
+                longitude: -46.6333
+            });
+
+            if (!url.includes('curr=BRL')) {
+                url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
+            }
+
+            await page.goto(url, { waitUntil: 'networkidle0' });
+
+            const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
+            
+            if (!mainContent) {
+                throw new Error(`No flight results found for ${url}`);
+            }
+
+            // Extract information from the first 4 flights
+            const flights = await page.evaluate(() => {
+                const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
                 
-                await page.setExtraHTTPHeaders({
-                    'Accept-Language': 'pt-BR,pt;q=0.9'
-                });
-
-                await page.setGeolocation({
-                    latitude: -23.5505,
-                    longitude: -46.6333
-                });
-
-                if (!url.includes('curr=BRL')) {
-                    url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
+                if (flightRows.length === 0) {
+                    return null;
                 }
 
-                await page.goto(url, { waitUntil: 'networkidle0' });
-
-                const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
-                
-                if (!mainContent) {
-                    throw new Error(`No flight results found for ${url}`);
-                }
-
-                // Extract information from the first 4 flights
-                const flights = await page.evaluate(() => {
-                    const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
+                return flightRows.map(row => {
+                    const stopDetails: StopDetails[] = [];
+                    const stopInfo = row.querySelector('.sSHqwe.tPgKwe.ogfYpf[aria-label*="Parada"]');
                     
-                    if (flightRows.length === 0) {
-                        return null;
-                    }
-
-                    return flightRows.map(row => {
-                        const stopDetails: StopDetails[] = [];
-                        const stopInfo = row.querySelector('.sSHqwe.tPgKwe.ogfYpf[aria-label*="Parada"]');
-                        
-                        if (stopInfo) {
-                            const stopMatch = stopInfo.getAttribute('aria-label')?.match(/Parada \(1 de 1\) de (.*?) no aeroporto (.*?), em/);
-                            if (stopMatch) {
-                                stopDetails.push({
-                                    airport: row.querySelector('.sSHqwe.tPgKwe.ogfYpf span[aria-label]')?.textContent?.trim() || 'N/A',
-                                    airportName: stopMatch[2] || 'N/A',
-                                    duration: stopMatch[1] || 'N/A'
-                                });
-                            }
+                    if (stopInfo) {
+                        const stopMatch = stopInfo.getAttribute('aria-label')?.match(/Parada \(1 de 1\) de (.*?) no aeroporto (.*?), em/);
+                        if (stopMatch) {
+                            stopDetails.push({
+                                airport: row.querySelector('.sSHqwe.tPgKwe.ogfYpf span[aria-label]')?.textContent?.trim() || 'N/A',
+                                airportName: stopMatch[2] || 'N/A',
+                                duration: stopMatch[1] || 'N/A'
+                            });
                         }
-
-                        return {
-                            departureTime: row.querySelector('.mv1WYe span[aria-label*="Horário de partida"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
-                            arrivalTime: row.querySelector('.mv1WYe span[aria-label*="Horário de chegada"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
-                            duration: row.querySelector('.gvkrdb')?.textContent?.trim() || 'N/A',
-                            airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
-                            stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
-                            stopDetails,
-                            price: parseInt(row.querySelector('.YMlIz.FpEdX span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
-                            emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
-                        };
-                    });
-                });
-
-                if (!flights) {
-                    throw new Error(`Failed to extract flight information for ${url}`);
-                }
-
-                const commonInfo = await page.evaluate(() => {
-                    const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
-                    const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
-                    const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
-
-                    if (!originInput || !destinationInput || !dateInput) {
-                        return null;
                     }
 
                     return {
-                        origin: originInput.value || 'N/A',
-                        destination: destinationInput.value || 'N/A',
-                        date: dateInput.value || 'N/A'
+                        departureTime: row.querySelector('.mv1WYe span[aria-label*="Horário de partida"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
+                        arrivalTime: row.querySelector('.mv1WYe span[aria-label*="Horário de chegada"]')?.getAttribute('aria-label')?.match(/\d{2}:\d{2}/)?.[0] || 'N/A',
+                        duration: row.querySelector('.gvkrdb')?.textContent?.trim() || 'N/A',
+                        airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
+                        stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
+                        stopDetails,
+                        price: parseInt(row.querySelector('.YMlIz.FpEdX span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
+                        emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
                     };
                 });
+            });
 
-                if (!commonInfo) {
-                    throw new Error(`Failed to extract flight details for ${url}`);
-                }
-
-                await browser.close();
-                return flights.map(flight => ({
-                    ...flight,
-                    ...commonInfo
-                }));
-
-            } catch (error: any) {
-                lastError = error;
-                await browser.close();
-                
-                if (attempt < retries) {
-                    console.log(`Attempt ${attempt} failed. Retrying...`);
-                }
-                continue;
+            if (!flights) {
+                throw new Error(`Failed to extract flight information for ${url}`);
             }
+
+            const commonInfo = await page.evaluate(() => {
+                const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
+                const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
+                const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
+
+                if (!originInput || !destinationInput || !dateInput) {
+                    return null;
+                }
+
+                return {
+                    origin: originInput.value || 'N/A',
+                    destination: destinationInput.value || 'N/A',
+                    date: dateInput.value || 'N/A'
+                };
+            });
+
+            if (!commonInfo) {
+                throw new Error(`Failed to extract flight details for ${url}`);
+            }
+
+            await browser.close();
+            return flights.map(flight => ({
+                ...flight,
+                ...commonInfo
+            }));
+
+        } catch (error: any) {
+            lastError = error;
+            await browser.close();
+            
+        } finally {
+            await browser.close();
         }
 
-        throw new Error(`Failed to fetch flight prices after ${retries} attempts. Last error: ${lastError?.message}
+        throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}
             url: ${url}`);
     }
 
@@ -328,4 +333,4 @@ export class GoogleFlightsService {
             console.error("Test run failed:", error);
         }
     }
-} 
+}
