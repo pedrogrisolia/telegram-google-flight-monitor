@@ -357,19 +357,19 @@ export class TelegramService {
                         const trend = priceChange > 0 ? '📈 Increased' : '📉 Decreased';
                         
                         const message = 
-                            `*Price Alert ${emoji}*\n\n` +
-                            `*Route:* ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
-                            `*Date:* ${trip.date}\n` +
+                            `<b>Price Alert ${emoji}</b>\n\n` +
+                            `<b>Route:</b> ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                            `<b>Date:</b> ${trip.date}\n` +
                             `━━━━━━━━━━━━━━━\n` +
                             `${trend} by:\n` +
                             `💰 R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n\n` +
-                            `*Previous Price:* ~R$${oldLowestPrice}~\n` +
-                            `*Current Price:* R$${newLowestPrice}\n` +
+                            `<b>Previous Price:</b> <del>R$${oldLowestPrice}</del>\n` +
+                            `<b>Current Price:</b> R$${newLowestPrice}\n` +
                             `━━━━━━━━━━━━━━━\n` +
-                            `[🔍 View on Google Flights](${trip.url})`;
+                            `<a href="${trip.url}">🔍 View on Google Flights</a>`;
 
                         await this.bot.sendMessage(trip.userId, message, {
-                            parse_mode: 'MarkdownV2',
+                            parse_mode: 'HTML',
                             disable_web_page_preview: true
                         });
 
@@ -413,16 +413,16 @@ export class TelegramService {
                 const message = tripGroup
                     .map((trip, index) => {
                         const lowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
-                        return  `*${i + index + 1}.* ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
-                                `*Date:* ${trip.date}\n` +
-                                `*Lowest price:* R$ ${lowestPrice}\n` +
+                        return  `<b>${i + index + 1}.</b> ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
+                                `<b>Date:</b> ${trip.date}\n` +
+                                `<b>Lowest price:</b> R$ ${lowestPrice}\n` +
                                 `━━━━━━━━━━━━━━━\n` +
-                                `[🔍 View on Google Flights](${trip.url})`;
+                                `<a href="${trip.url}">🔍 View on Google Flights</a>`;
                     })
                     .join('\n\n');
                 
                 await this.bot.sendMessage(chatId, message, {
-                    parse_mode: 'MarkdownV2',
+                    parse_mode: 'HTML',
                     disable_web_page_preview: true
                 });
             }
