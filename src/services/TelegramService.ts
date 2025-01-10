@@ -369,7 +369,7 @@ export class TelegramService {
                             `[🔍 View on Google Flights](${trip.url})`;
 
                         await this.bot.sendMessage(trip.userId, message, {
-                            parse_mode: 'Markdown',
+                            parse_mode: 'MarkdownV2',
                             disable_web_page_preview: true
                         });
 
@@ -422,7 +422,7 @@ export class TelegramService {
                     .join('\n\n');
                 
                 await this.bot.sendMessage(chatId, message, {
-                    parse_mode: 'Markdown',
+                    parse_mode: 'MarkdownV2',
                     disable_web_page_preview: true
                 });
             }
