@@ -363,7 +363,7 @@ export class TelegramService {
                             `━━━━━━━━━━━━━━━\n` +
                             `${trend} by:\n` +
                             `💰 R$ ${Math.abs(priceChange)} (${absolutePercentageChange}%)\n\n` +
-                            `*Previous Price:* ~R$ ${oldLowestPrice}~\n` +
+                            `*Previous Price:* ~~R$ ${oldLowestPrice}~~\n` +
                             `*Current Price:* R$ ${newLowestPrice}\n` +
                             `━━━━━━━━━━━━━━━\n` +
                             `[🔍 View on Google Flights](${trip.url})`;
