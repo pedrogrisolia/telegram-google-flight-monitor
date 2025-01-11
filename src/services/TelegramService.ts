@@ -75,29 +75,42 @@ export class TelegramService {
     }
 
     private setupHandlers() {
-        this.bot.onText(/\/start/, this.handleStart.bind(this));
-        this.bot.onText(/\/monitor/, this.startMonitoring.bind(this));
-        this.bot.onText(/\/stop/, this.handleStopCommand.bind(this));
-        this.bot.onText(/\/list/, this.handleListCommand.bind(this));
+        const commandHandlers = [
+            { pattern: /\/start/, handler: this.handleStart },
+            { pattern: /\/monitor/, handler: this.startMonitoring },
+            { pattern: /\/stop/, handler: this.handleStopCommand },
+            { pattern: /\/list/, handler: this.handleListCommand },
+            { pattern: /\/language/, handler: this.handleLanguageCommand }
+        ];
+
+        // Register command handlers with state clearing
+        for (const { pattern, handler } of commandHandlers) {
+            this.bot.onText(pattern, async (msg) => {
+                const userId = msg.from?.id;
+                if (userId) {
+                    // Clear previous state before handling new command
+                    this.userStates.delete(userId);
+                }
+                await handler.bind(this)(msg);
+            });
+        }
+
+        // Register other handlers
         this.bot.on("message", this.handleMessage.bind(this));
         this.bot.on("callback_query", this.handleCallbackQuery.bind(this));
-        this.bot.onText(/\/language/, this.handleLanguageCommand.bind(this));
+    }
+
+    private async getUserLanguage(userId: number): Promise<string> {
+        const user = await AppDataSource.manager.findOne(User, { where: { id: userId } });
+        return user?.language || 'en';
     }
 
     private async handleStart(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
-        const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
         if (!userId) return;
 
-        let user = await AppDataSource.manager.findOne(User, { where: { id: userId } });
-        if (!user) {
-            user = new User();
-            user.id = userId;
-        }
-        user.language = language;
-        await AppDataSource.manager.save(user);
-
+        const language = await this.getUserLanguage(userId);
         await this.bot.sendMessage(chatId,
             getTranslation("welcomeMessage", language)
         );
@@ -106,9 +119,9 @@ export class TelegramService {
     private async startMonitoring(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
-        const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
         if (!userId) return;
 
+        const language = await this.getUserLanguage(userId);
         await this.bot.sendMessage(chatId, 
             getTranslation("setupMessage", language)
         );
@@ -120,6 +133,7 @@ export class TelegramService {
         const userId = msg.from?.id;
         const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
         if (!userId) return;
+
 
         const state = this.userStates.get(userId);
         if (!state) return;
@@ -182,6 +196,7 @@ export class TelegramService {
 
         const chatId = query.message.chat.id;
         const userId = query.from.id;
+        const language = await this.getUserLanguage(userId);
 
         if (query.data.startsWith('lang_')) {
             const newLanguage = query.data.split('_')[1] as 'en' | 'pt-BR';
@@ -204,8 +219,6 @@ export class TelegramService {
         }
 
         // Rest of the existing callback query handling
-        const language = (await AppDataSource.manager.findOne(User, { where: { id: userId } }))?.language || 'en';
-        
         if (query.data.startsWith('stop_')) {
             const flightId = parseInt(query.data.split('_')[1]);
             await this.stopMonitoring(chatId, userId, flightId, language);
@@ -485,9 +498,9 @@ export class TelegramService {
     private async handleListCommand(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
-        const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
         if (!userId) return;
 
+        const language = await this.getUserLanguage(userId);
         try {
             const trips = await AppDataSource.manager.find(Trip, {
                 where: { userId, isActive: true },
@@ -545,9 +558,9 @@ export class TelegramService {
     private async handleStopCommand(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
-        const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
         if (!userId) return;
 
+        const language = await this.getUserLanguage(userId);
         try {
             const trips = await AppDataSource.manager.find(Trip, {
                 where: { userId, isActive: true },
