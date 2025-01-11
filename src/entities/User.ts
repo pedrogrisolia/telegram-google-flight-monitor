@@ -8,4 +8,6 @@ export class User {
 
     @OneToMany(() => Trip, trip => trip.user)
     trips!: Trip[];
-} 
+
+    language?: string;
+}

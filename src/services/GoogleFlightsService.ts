@@ -193,19 +193,7 @@ export class GoogleFlightsService {
             ],
             ignoreDefaultArgs: ['--disable-extensions'],
             timeout: 30000
-        });  
-        
-        setTimeout(async () => {
-            try {
-                if (browser && browser.isConnected()) {
-                    await browser.close();
-                    console.log('Browser closed by timeout');
-                }
-            } catch (error) {
-                console.error('Error closing browser by timeout:', error);
-            }
-        }, 30000);
-
+        });
         try {
             const page = await browser.newPage();
             
