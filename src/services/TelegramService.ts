@@ -62,12 +62,13 @@ export class TelegramService {
     constructor() {
         this.bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN || "", { polling: true });
         
-        // Set up bot commands in Telegram menu
+        // Update bot commands to include language command
         this.bot.setMyCommands([
             { command: 'start', description: 'Start the bot' },
             { command: 'monitor', description: 'Monitor a new flight' },
             { command: 'stop', description: 'Stop monitoring a flight' },
-            { command: 'list', description: 'List all monitored flights' }
+            { command: 'list', description: 'List all monitored flights' },
+            { command: 'language', description: 'Change language / Mudar idioma 🌎' }
         ]);
         
         this.setupHandlers();
@@ -80,6 +81,7 @@ export class TelegramService {
         this.bot.onText(/\/list/, this.handleListCommand.bind(this));
         this.bot.on("message", this.handleMessage.bind(this));
         this.bot.on("callback_query", this.handleCallbackQuery.bind(this));
+        this.bot.onText(/\/language/, this.handleLanguageCommand.bind(this));
     }
 
     private async handleStart(msg: TelegramBot.Message) {
@@ -180,8 +182,30 @@ export class TelegramService {
 
         const chatId = query.message.chat.id;
         const userId = query.from.id;
-        const language = query.from.language_code === 'pt-BR' ? 'pt-BR' : 'en';
 
+        if (query.data.startsWith('lang_')) {
+            const newLanguage = query.data.split('_')[1] as 'en' | 'pt-BR';
+            
+            // Update user language in database
+            let user = await AppDataSource.manager.findOne(User, { where: { id: userId } });
+            if (!user) {
+                user = new User();
+                user.id = userId;
+            }
+            user.language = newLanguage;
+            await AppDataSource.manager.save(user);
+
+            // Send confirmation message
+            await this.bot.sendMessage(
+                chatId,
+                getTranslation("languageChangedMessage", newLanguage)
+            );
+            return;
+        }
+
+        // Rest of the existing callback query handling
+        const language = (await AppDataSource.manager.findOne(User, { where: { id: userId } }))?.language || 'en';
+        
         if (query.data.startsWith('stop_')) {
             const flightId = parseInt(query.data.split('_')[1]);
             await this.stopMonitoring(chatId, userId, flightId, language);
@@ -193,6 +217,36 @@ export class TelegramService {
             await this.setupFlightMonitoringWithRange(chatId, userId, state.url, state.date, range, language);
             this.userStates.delete(userId);
         }
+    }
+
+    private async handleLanguageCommand(msg: TelegramBot.Message) {
+        const chatId = msg.chat.id;
+        const userId = msg.from?.id;
+        if (!userId) return;
+
+        const user = await AppDataSource.manager.findOne(User, { where: { id: userId } });
+        const currentLanguage = user?.language || 'en';
+
+        const keyboard = [
+            [{
+                text: getTranslation("languageEnglish", currentLanguage),
+                callback_data: "lang_en"
+            }],
+            [{
+                text: getTranslation("languagePortuguese", currentLanguage),
+                callback_data: "lang_pt-BR"
+            }]
+        ];
+
+        await this.bot.sendMessage(
+            chatId,
+            getTranslation("languageSelectionMessage", currentLanguage),
+            {
+                reply_markup: {
+                    inline_keyboard: keyboard
+                }
+            }
+        );
     }
 
     private parseBrazilianDate(dateStr: string): Date {

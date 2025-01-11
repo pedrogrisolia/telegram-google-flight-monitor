@@ -20,7 +20,7 @@
   "startingPriceCheckMessage": "Starting price check for all active trips...",
   "foundActiveTripsMessage": "Found ${count} active trips to check",
   "checkingTripMessage": "Checking trip ID ${tripId}: ${origin} → ${destination} (${date})",
-  "tripUrlMessage": "URL: ${trip.url}",
+  "tripUrlMessage": "URL: ${url}",
   "currentLowestPriceMessage": "Current lowest price: R$ ${oldLowestPrice}",
   "fetchingNewPricesMessage": "Fetching new prices from Google Flights...",
   "foundNewFlightsMessage": "Found ${count} flights",
@@ -39,5 +39,10 @@
   "priceAlert": "<b>Price Alert ${emoji}</b>\n\n<b>Route:</b> ${origin} ✈️ ${destination}\n<b>Date:</b> ${date}\n━━━━━━━━━━━━━━━\n${trend} by:\n💰 R$ ${priceChange} (${percentage}%)\n\n<b>Previous Price:</b> <del>R$${oldPrice}</del>\n<b>Current Price:</b> R$${newPrice}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 View on Google Flights</a>",
   "priceIncreased": "📈 Increased",
   "priceDecreased": "📉 Decreased",
-  "tripListItem": "<b>${index}.</b> ${origin} ✈️ ${destination}\n<b>Date:</b> ${date}\n<b>Lowest price:</b> R$ ${price}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 View on Google Flights</a>"
+  "tripListItem": "<b>${index}.</b> ${origin} ✈️ ${destination}\n<b>Date:</b> ${date}\n<b>Lowest price:</b> R$ ${price}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 View on Google Flights</a>",
+  "languageCommandDescription": "Change language / Mudar idioma 🌎",
+  "languageSelectionMessage": "🌎 Please select your language:",
+  "languageChangedMessage": "✅ Language changed to English",
+  "languageEnglish": "🇺🇸 English",
+  "languagePortuguese": "🇧🇷 Portuguese"
 }
