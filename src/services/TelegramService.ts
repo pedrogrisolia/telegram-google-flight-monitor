@@ -319,7 +319,7 @@ export class TelegramService {
 
             if (successCount > 0) {
                 await this.bot.sendMessage(chatId,
-                    getTranslation("successMessage", language, { successCount })
+                    getTranslation("successMessage", language, { count: successCount })
                 );
             } else {
                 await this.bot.sendMessage(chatId,
@@ -343,11 +343,16 @@ export class TelegramService {
                 where: { isActive: true },
                 relations: ['flights']
             });
-            console.log(getTranslation("foundActiveTripsMessage", "en", { activeTrips: activeTrips.length }));
+            console.log(getTranslation("foundActiveTripsMessage", "en", { count: activeTrips.length }));
 
             for (const trip of activeTrips) {
                 try {
-                    console.log(getTranslation("checkingTripMessage", "en", { trip: trip.id, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));
+                    console.log(getTranslation("checkingTripMessage", "en", { 
+                        tripId: trip.id, 
+                        origin: trip.flights[0].origin, 
+                        destination: trip.flights[0].destination, 
+                        date: trip.date 
+                    }));
                     console.log(getTranslation("tripUrlMessage", "en", { url: trip.url }));
                     
                     // Get current lowest price for the trip
@@ -357,7 +362,7 @@ export class TelegramService {
                     // Fetch new prices
                     console.log(getTranslation("fetchingNewPricesMessage", "en"));
                     const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url);
-                    console.log(getTranslation("foundNewFlightsMessage", "en", { newFlights: newFlights.length }));
+                    console.log(getTranslation("foundNewFlightsMessage", "en", { count: newFlights.length }));
 
                     const newLowestPrice = Math.min(...newFlights.map(f => f.price));
                     console.log(getTranslation("newLowestPriceMessage", "en", { newLowestPrice }));
@@ -377,7 +382,7 @@ export class TelegramService {
                     }
 
                     const savedFligths = await AppDataSource.manager.save(trip.flights);
-                    console.log(getTranslation("updatedFlightsMessage", "en", { savedFligths: savedFligths.length }));
+                    console.log(getTranslation("updatedFlightsMessage", "en", { count: savedFligths.length }));
 
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
@@ -413,7 +418,7 @@ export class TelegramService {
                         console.log(getTranslation("notifiedUserMessage", "en", { userId: trip.userId, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));
                     }
                 } catch (error) {
-                    console.error(getTranslation("failedToCheckPricesMessage", "en", { trip: trip.id }), error);
+                    console.error(getTranslation("failedToCheckPricesMessage", "en", { tripId: trip.id }), error);
                 }
             }
             
@@ -452,7 +457,7 @@ export class TelegramService {
             }
 
             // Send initial message
-            await this.bot.sendMessage(chatId, getTranslation("listTripsMessage", language, { trips: trips.length }));
+            await this.bot.sendMessage(chatId, getTranslation("listTripsMessage", language, { count: trips.length }));
 
             // Split trips into groups of 10
             const TRIPS_PER_MESSAGE = 10;
@@ -461,11 +466,14 @@ export class TelegramService {
                 const message = tripGroup
                     .map((trip, index) => {
                         const lowestPrice = Math.min(...trip.flights.map(f => f.currentPrice));
-                        return  `<b>${i + index + 1}.</b> ${trip.flights[0].origin} ✈️ ${trip.flights[0].destination}\n` +
-                                `<b>Date:</b> ${trip.date}\n` +
-                                `<b>Lowest price:</b> R$ ${lowestPrice}\n` +
-                                `━━━━━━━━━━━━━━━\n` +
-                                `<a href="${trip.url}">🔍 View on Google Flights</a>`;
+                        return getTranslation("tripListItem", language, {
+                            index: i + index + 1,
+                            origin: trip.flights[0].origin,
+                            destination: trip.flights[0].destination,
+                            date: trip.date,
+                            price: lowestPrice,
+                            url: trip.url
+                        });
                     })
                     .join('\n\n');
                 
@@ -533,7 +541,11 @@ export class TelegramService {
             await AppDataSource.manager.save(trip);
 
             await this.bot.sendMessage(chatId,
-                getTranslation("stoppedMonitoringMessage", language, { origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date })
+                getTranslation("stoppedMonitoringMessage", language, { 
+                    origin: trip.flights[0].origin, 
+                    destination: trip.flights[0].destination, 
+                    date: trip.date 
+                })
             );
         } catch (error) {
             console.error("Error stopping flight monitor:", error);
