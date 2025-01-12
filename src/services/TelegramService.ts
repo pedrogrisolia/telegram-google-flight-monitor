@@ -564,8 +564,13 @@ export class TelegramService {
         try {
             const trips = await AppDataSource.manager.find(Trip, {
                 where: { userId, isActive: true },
-                relations: ['flights'],
-                order: { flights: { currentPrice: 'ASC' } }
+                relations: ['flights']
+            });
+
+            trips.sort((a, b) => {
+                const dateA = this.parseBrazilianDate(a.date);
+                const dateB = this.parseBrazilianDate(b.date);
+                return dateA.getTime() - dateB.getTime();
             });
 
             if (trips.length === 0) {
