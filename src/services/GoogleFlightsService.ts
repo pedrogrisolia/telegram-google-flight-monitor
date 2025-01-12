@@ -1,4 +1,4 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer';
 
 export interface StopDetails {
     airport: string;
@@ -86,7 +86,6 @@ export class GoogleFlightsService {
     }
 
     private static browser: Browser | null = null;
-    private static page: Page | null = null;
 
     static async initBrowser() {
         if (!this.browser) {
@@ -105,9 +104,6 @@ export class GoogleFlightsService {
                 ],
                 timeout: 30000
             });
-            this.page = await this.browser.newPage();
-            await this.page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
-            await this.page.setGeolocation({ latitude: -23.5505, longitude: -46.6333 });
         }
     }
 
@@ -203,26 +199,32 @@ export class GoogleFlightsService {
     }
 
     private static async scrapeFlightPrices(url: string): Promise<FlightDetails[]> {
-        await this.initBrowser();
-        if (!this.page) throw new Error("Browser page not available");
+        if(!this.browser) {
+            throw new Error('Browser not initialized');
+        }
+    
 
         if (!url.includes('curr=BRL')) {
             url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
         }
 
         let lastError: Error | null = null;
-        
+        const page = await this.browser.newPage();
         try {
-            await this.page.goto(url, { waitUntil: 'networkidle0' });
+            
+            await page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
+            await page.setGeolocation({ latitude: -23.5505, longitude: -46.6333 });
 
-            const mainContent = await this.page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
+            await page.goto(url, { waitUntil: 'networkidle0' });
+
+            const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
             
             if (!mainContent) {
                 throw new Error(`No flight results found for ${url}`);
             }
 
             // Extract information from the first 4 flights
-            const flights = await this.page.evaluate(() => {
+            const flights = await page.evaluate(() => {
                 const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
                 
                 if (flightRows.length === 0) {
@@ -261,7 +263,7 @@ export class GoogleFlightsService {
                 throw new Error(`Failed to extract flight information for ${url}`);
             }
 
-            const commonInfo = await this.page.evaluate(() => {
+            const commonInfo = await page.evaluate(() => {
                 const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
                 const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
                 const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
@@ -280,7 +282,7 @@ export class GoogleFlightsService {
             if (!commonInfo) {
                 throw new Error(`Failed to extract flight details for ${url}`);
             }
-
+            await page.close();
             return flights.map(flight => ({
                 ...flight,
                 ...commonInfo
@@ -289,6 +291,8 @@ export class GoogleFlightsService {
         } catch (error: any) {
             lastError = error;
             
+        } finally { 
+            await page.close();
         }
 
         throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}
@@ -299,7 +303,6 @@ export class GoogleFlightsService {
         if (this.browser) {
             await this.browser.close();
             this.browser = null;
-            this.page = null;
         }
     }
 
