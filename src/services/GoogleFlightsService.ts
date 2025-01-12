@@ -178,6 +178,7 @@ export class GoogleFlightsService {
 
     private static async scrapeFlightPrices(url: string): Promise<FlightDetails[]> {
         let lastError: Error | null = null;
+        
         const browser = await puppeteer.launch({
             headless: "new",
             args: [
