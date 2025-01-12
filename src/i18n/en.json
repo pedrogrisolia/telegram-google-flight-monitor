@@ -14,7 +14,7 @@
   "noMonitorFoundMessage": "Sorry, I couldn't find that flight monitor.",
   "stopErrorMessage": "Sorry, there was an error stopping the flight monitor.",
   "processingUrlMessage": "Processing URL: ${url}",
-  "settingUpMonitoringMessage": "Setting up flight monitoring for ${range === 0 ? 'selected date' : `±${range} days`}...",
+  "settingUpMonitoringMessage": "Setting up flight monitoring for ±${range} days...",
   "listTripsMessage": "You have ${count} monitored trips:",
   "stoppedMonitoringMessage": "✅ Stopped monitoring flights from ${origin} to ${destination} on ${date}.",
   "startingPriceCheckMessage": "Starting price check for all active trips...",

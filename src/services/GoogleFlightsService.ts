@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 
 export interface StopDetails {
     airport: string;
@@ -83,6 +83,32 @@ export class GoogleFlightsService {
         }
         
         return url;
+    }
+
+    private static browser: Browser | null = null;
+    private static page: Page | null = null;
+
+    static async initBrowser() {
+        if (!this.browser) {
+            this.browser = await puppeteer.launch({
+                headless: "new",
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-extensions',
+                    '--lang=pt-BR'
+                ],
+                timeout: 30000
+            });
+            this.page = await this.browser.newPage();
+            await this.page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
+            await this.page.setGeolocation({ latitude: -23.5505, longitude: -46.6333 });
+        }
     }
 
     static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
@@ -177,50 +203,26 @@ export class GoogleFlightsService {
     }
 
     private static async scrapeFlightPrices(url: string): Promise<FlightDetails[]> {
+        await this.initBrowser();
+        if (!this.page) throw new Error("Browser page not available");
+
+        if (!url.includes('curr=BRL')) {
+            url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
+        }
+
         let lastError: Error | null = null;
         
-        const browser = await puppeteer.launch({
-            headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-extensions',
-                '--lang=pt-BR'
-            ],
-            ignoreDefaultArgs: ['--disable-extensions'],
-            timeout: 30000
-        });
         try {
-            const page = await browser.newPage();
-            
-            await page.setExtraHTTPHeaders({
-                'Accept-Language': 'pt-BR,pt;q=0.9'
-            });
+            await this.page.goto(url, { waitUntil: 'networkidle0' });
 
-            await page.setGeolocation({
-                latitude: -23.5505,
-                longitude: -46.6333
-            });
-
-            if (!url.includes('curr=BRL')) {
-                url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
-            }
-
-            await page.goto(url, { waitUntil: 'networkidle0' });
-
-            const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
+            const mainContent = await this.page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
             
             if (!mainContent) {
                 throw new Error(`No flight results found for ${url}`);
             }
 
             // Extract information from the first 4 flights
-            const flights = await page.evaluate(() => {
+            const flights = await this.page.evaluate(() => {
                 const flightRows = Array.from(document.querySelectorAll('.OgQvJf.nKlB3b')).slice(0, 4);
                 
                 if (flightRows.length === 0) {
@@ -259,7 +261,7 @@ export class GoogleFlightsService {
                 throw new Error(`Failed to extract flight information for ${url}`);
             }
 
-            const commonInfo = await page.evaluate(() => {
+            const commonInfo = await this.page.evaluate(() => {
                 const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
                 const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
                 const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
@@ -279,7 +281,6 @@ export class GoogleFlightsService {
                 throw new Error(`Failed to extract flight details for ${url}`);
             }
 
-            await browser.close();
             return flights.map(flight => ({
                 ...flight,
                 ...commonInfo
@@ -287,39 +288,19 @@ export class GoogleFlightsService {
 
         } catch (error: any) {
             lastError = error;
-            await browser.close();
             
-        } finally {
-            await browser.close();
         }
 
         throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}
             url: ${url}`);
     }
 
-    static async testRun(): Promise<void> {
-        try {
-            console.log("Testing Google Flights Search...");
-            // Update test URL to include Brazilian parameters
-            const testUrl = "https://www.google.com/travel/flights/search?tfs=CBwQAhotEgoyMDI1LTA0LTI1agwIAxIIL20vMDZnbXJyEQgDEg0vZy8xMWJjNnhscHBkQAFIAXABggELCP___________wGYAQI&tfu=EgoIABAAGAAgASgE&curr=BRL&hl=pt-BR";
-            const results = await this.getFlightPricesFromUrl(testUrl);
-            
-            console.log("\nFlight Information:");
-            results.forEach((flight, index) => {
-                console.log(`\n=== Flight ${index + 1} ===`);
-                console.log("Origin:", flight.origin);
-                console.log("Destination:", flight.destination);
-                console.log("Date:", flight.date);
-                console.log("Departure Time:", flight.departureTime);
-                console.log("Arrival Time:", flight.arrivalTime);
-                console.log("Duration:", flight.duration);
-                console.log("Airline:", flight.airline);
-                console.log("Stops:", flight.stops);
-                console.log("Price:", flight.price);
-                console.log("Emissions:", flight.emissions);
-            });
-        } catch (error) {
-            console.error("Test run failed:", error);
+    static async cleanup() {
+        if (this.browser) {
+            await this.browser.close();
+            this.browser = null;
+            this.page = null;
         }
     }
+
 }

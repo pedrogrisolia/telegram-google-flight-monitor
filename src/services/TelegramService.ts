@@ -131,8 +131,9 @@ export class TelegramService {
     private async handleMessage(msg: TelegramBot.Message) {
         const chatId = msg.chat.id;
         const userId = msg.from?.id;
-        const language = msg.from?.language_code === 'pt-BR' ? 'pt-BR' : 'en';
+        
         if (!userId) return;
+        const language = await this.getUserLanguage(userId);
 
 
         const state = this.userStates.get(userId);

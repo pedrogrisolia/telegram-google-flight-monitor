@@ -14,7 +14,7 @@
   "noMonitorFoundMessage": "Desculpe, não consegui encontrar esse monitor de voo.",
   "stopErrorMessage": "Desculpe, houve um erro ao parar o monitor de voo.",
   "processingUrlMessage": "Processando URL: ${url}",
-  "settingUpMonitoringMessage": "Configurando o monitoramento de voo para ${range === 0 ? 'data selecionada' : `±${range} dias`}...",
+  "settingUpMonitoringMessage": "Configurando o monitoramento de voo para ±${range} dias...",
   "listTripsMessage": "Você tem ${count} viagens monitoradas:",
   "stoppedMonitoringMessage": "✅ Parou de monitorar voos de ${origin} para ${destination} em ${date}.",
   "startingPriceCheckMessage": "Iniciando a verificação de preços para todas as viagens ativas...",
