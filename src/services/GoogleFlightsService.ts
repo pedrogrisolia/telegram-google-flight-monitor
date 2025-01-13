@@ -289,12 +289,22 @@ export class GoogleFlightsService {
 
         } catch (error: any) {
             lastError = error;
-            await page.close();
-            await browser.close();
+            if(!page.isClosed()) {
+                await page.close();
+            }
+            if(browser.isConnected()) {
+                await browser.close();
+            }
             
         } finally {
-            await page.close();
-            await browser.close();
+            if(!page.isClosed()) {
+                await page.close();
+            }
+            if(browser.isConnected()) {
+                await browser.close();
+            }
+
+            
         }
 
         throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}
