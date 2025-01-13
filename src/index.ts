@@ -6,7 +6,6 @@ import * as dotenv from "dotenv";
 import * as http from 'http';
 import { BackupService } from './services/BackupService';
 import { Trip } from "./entities/Trip";
-import { GoogleFlightsService } from "./services/GoogleFlightsService";
 
 dotenv.config();
 
@@ -61,8 +60,6 @@ async function main() {
         const telegramService = new TelegramService();
         console.log("Telegram bot service initialized");
 
-        await GoogleFlightsService.initBrowser();
-
         // Run initial price check
         await telegramService.checkPriceUpdates();
         console.log("Initial price check completed");
@@ -94,13 +91,11 @@ async function main() {
 
 process.on('SIGINT', async () => {
     console.log('Shutting down...');
-    await GoogleFlightsService.cleanup();
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     console.log('Shutting down...');
-    await GoogleFlightsService.cleanup();
     process.exit(0);
 });
 

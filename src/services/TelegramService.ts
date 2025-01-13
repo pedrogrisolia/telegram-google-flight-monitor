@@ -491,8 +491,12 @@ export class TelegramService {
             }
             
             console.log("\nPrice check completed");
-        } catch (error) {
+        } catch (error: any) {
             console.error(getTranslation("errorInCheckPriceUpdatesMessage", "en"), error);
+            if (error.message?.includes("Failed to launch the browser process!")) {
+                console.log("Critical Puppeteer error detected, restarting app...");
+                process.exit(1);
+            }
         }
     }
 

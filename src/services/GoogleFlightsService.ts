@@ -1,4 +1,4 @@
-import puppeteer, { Browser } from 'puppeteer';
+import puppeteer from 'puppeteer';
 
 export interface StopDetails {
     airport: string;
@@ -83,28 +83,6 @@ export class GoogleFlightsService {
         }
         
         return url;
-    }
-
-    private static browser: Browser | null = null;
-
-    static async initBrowser() {
-        if (!this.browser) {
-            this.browser = await puppeteer.launch({
-                headless: "new",
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-extensions',
-                    '--lang=pt-BR'
-                ],
-                timeout: 30000
-            });
-        }
     }
 
     static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
@@ -199,21 +177,40 @@ export class GoogleFlightsService {
     }
 
     private static async scrapeFlightPrices(url: string): Promise<FlightDetails[]> {
-        if(!this.browser) {
-            throw new Error('Browser not initialized');
-        }
-    
-
-        if (!url.includes('curr=BRL')) {
-            url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
-        }
-
         let lastError: Error | null = null;
-        const page = await this.browser.newPage();
+        
+        const browser = await puppeteer.launch({
+            headless: "new",
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-extensions',
+                '--lang=pt-BR'
+            ],
+            ignoreDefaultArgs: ['--disable-extensions'],
+            timeout: 30000
+        });
+        const page = await browser.newPage();
         try {
             
-            await page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
-            await page.setGeolocation({ latitude: -23.5505, longitude: -46.6333 });
+            
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'pt-BR,pt;q=0.9'
+            });
+
+            await page.setGeolocation({
+                latitude: -23.5505,
+                longitude: -46.6333
+            });
+
+            if (!url.includes('curr=BRL')) {
+                url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
+            }
 
             await page.goto(url, { waitUntil: 'networkidle0' });
 
@@ -283,6 +280,7 @@ export class GoogleFlightsService {
                 throw new Error(`Failed to extract flight details for ${url}`);
             }
             await page.close();
+            await browser.close();
             return flights.map(flight => ({
                 ...flight,
                 ...commonInfo
@@ -290,20 +288,16 @@ export class GoogleFlightsService {
 
         } catch (error: any) {
             lastError = error;
-            
-        } finally { 
             await page.close();
+            await browser.close();
+            
+        } finally {
+            await page.close();
+            await browser.close();
         }
 
         throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}
             url: ${url}`);
-    }
-
-    static async cleanup() {
-        if (this.browser) {
-            await this.browser.close();
-            this.browser = null;
-        }
     }
 
 }
