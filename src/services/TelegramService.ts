@@ -485,15 +485,19 @@ export class TelegramService {
 
                         console.log(getTranslation("notifiedUserMessage", "en", { userId: trip.userId, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));
                     }
-                } catch (error) {
+                } catch (error: Error | any) {
                     console.error(getTranslation("failedToCheckPricesMessage", "en", { tripId: trip.id }), error);
+                    if (error?.message?.includes("Failed to launch the browser process!")) {
+                        console.log("Critical Puppeteer error detected, restarting app...");
+                        process.exit(1);
+                    }
                 }
             }
             
             console.log("\nPrice check completed");
-        } catch (error: any) {
+        } catch (error: Error | any) {
             console.error(getTranslation("errorInCheckPriceUpdatesMessage", "en"), error);
-            if (error.message?.includes("Failed to launch the browser process!")) {
+            if (error?.message?.includes("Failed to launch the browser process!")) {
                 console.log("Critical Puppeteer error detected, restarting app...");
                 process.exit(1);
             }

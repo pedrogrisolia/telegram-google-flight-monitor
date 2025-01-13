@@ -1,5 +1,5 @@
 {
-  "welcomeMessage": "Bem-vindo ao Bot de Monitoramento de Preços de Voos! 🛫\n\nPosso ajudá-lo a monitorar os preços de voos e notificá-lo quando eles mudarem.\n\nUse /monitor para começar a monitorar um novo voo\nUse /stop para parar de monitorar voos",
+  "welcomeMessage": "Bem-vindo ao Bot de Monitoramento de Preços de Voos! 🛫\n\nPosso ajudá-lo a monitorar os preços de voos e notificá-lo quando eles mudarem.\n\nComandos disponíveis:\n/monitor - Começar a monitorar um novo voo\n/stop - Parar de monitorar voos\n/list - Listar seus voos monitorados\n/language - Mudar idioma",
   "setupMessage": "Vamos configurar o monitoramento de voos! 🛫\n\nPor favor, envie-me o URL do Google Flights para o voo que você deseja monitorar.\nCertifique-se de que seja um URL de pesquisa válido do Google Flights com sua rota e data desejadas.",
   "invalidUrlMessage": "Por favor, envie um URL do Google Flights válido.\nCertifique-se de copiar o URL inteiro do seu navegador.",
   "urlErrorMessage": "Desculpe, houve um erro ao processar o URL. Por favor, certifique-se de que é um URL do Google Flights válido e tente novamente.",

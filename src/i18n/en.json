@@ -1,5 +1,5 @@
 {
-  "welcomeMessage": "Welcome to the Flight Price Monitor Bot! 🛫\n\nI can help you monitor flight prices and notify you when they change.\n\nUse /monitor to start monitoring a new flight\nUse /stop to stop monitoring flights",
+  "welcomeMessage": "Welcome to the Flight Price Monitor Bot! 🛫\n\nI can help you monitor flight prices and notify you when they change.\n\nAvailable commands:\n/monitor - Start monitoring a new flight\n/stop - Stop monitoring flights\n/list - List your monitored flights\n/language - Change language",
   "setupMessage": "Let's set up flight monitoring! 🛫\n\nPlease send me the Google Flights URL for the flight you want to monitor.\nMake sure it's a valid Google Flights search URL with your desired route and date.",
   "invalidUrlMessage": "Please send a valid Google Flights URL.\nMake sure you're copying the entire URL from your browser.",
   "urlErrorMessage": "Sorry, there was an error processing the URL. Please make sure it's a valid Google Flights URL and try again.",
