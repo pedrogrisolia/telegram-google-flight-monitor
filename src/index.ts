@@ -1,6 +1,5 @@
 import { AppDataSource } from "./config/database";
 import { TelegramService } from "./services/TelegramService";
-import { MemoryMonitorService } from "./services/MemoryMonitorService";
 import * as schedule from "node-schedule";
 import * as dotenv from "dotenv";
 import * as http from 'http';
@@ -76,10 +75,6 @@ async function main() {
         // Initialize backup service
         BackupService.initialize();
 
-        // Initialize memory monitor service
-        const memoryMonitorService = new MemoryMonitorService();
-        memoryMonitorService.startMonitoring();
-        console.log("Memory monitoring service initialized");
 
     } catch (error: any) {
         console.error("Error starting the application:", error.message);
