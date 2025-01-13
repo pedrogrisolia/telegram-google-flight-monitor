@@ -103,6 +103,7 @@ export class GoogleFlightsService {
                 }));
             } catch (error11) {
                 console.log("Failed with 11 underscores, trying with 12...");
+                console.error(error11);
                 try {
                     const urlWith12 = this.cleanUrl(url, 12);
                     if (!this.validateGoogleFlightsUrl(urlWith12)) {
@@ -114,7 +115,7 @@ export class GoogleFlightsService {
                         successfulUrl: urlWith12
                     }));
                 } catch (error12) {
-                    throw error11;
+                    throw error12;
                 }
             }
         }
