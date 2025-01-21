@@ -9,7 +9,16 @@ export const AppDataSource = new DataSource({
     url: process.env.MYSQL_URL,
     synchronize: true,
     entities: [User, Trip, Flight, PriceHistory],
+    poolSize: 10,
+    extra: {
+        connectionLimit: 10,
+        keepAliveInitialDelay: 10000,
+        enableKeepAlive: true
+    },
     ssl: {
         rejectUnauthorized: false
-    }
+    },
+    logging: ["error"],
+    migrations: [],
+    subscribers: []
 });
