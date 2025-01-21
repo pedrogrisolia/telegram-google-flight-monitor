@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer';
-import { getRepository } from 'typeorm';
+import { AppDataSource } from '../config/database';
 import { Flight } from '../entities/Flight';
 import { PriceHistory } from '../entities/PriceHistory';
 
@@ -27,8 +27,8 @@ export interface FlightDetails {
 export class GoogleFlightsService {
 
     private static async updatePriceHistory(flight: Flight, newPrice: number): Promise<void> {
-        const flightRepository = getRepository(Flight);
-        const priceHistoryRepository = getRepository(PriceHistory);
+        const flightRepository = AppDataSource.getRepository(Flight);
+        const priceHistoryRepository = AppDataSource.getRepository(PriceHistory);
         
         // Create new price history record
         const priceHistory = new PriceHistory();
@@ -114,7 +114,7 @@ export class GoogleFlightsService {
     }
 
     static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
-        const flightRepository = getRepository(Flight);
+        const flightRepository = AppDataSource.getRepository(Flight);
         const underscoreCount = this.countUnderscores(url);
         console.log(`URL has ${underscoreCount} underscores`);
 

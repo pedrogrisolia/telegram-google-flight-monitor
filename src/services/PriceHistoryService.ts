@@ -1,10 +1,10 @@
-import { getRepository } from 'typeorm';
+import { AppDataSource } from '../config/database';
 import { Flight } from '../entities/Flight';
 import { PriceHistory } from '../entities/PriceHistory';
 
 export class PriceHistoryService {
-    private flightRepository = getRepository(Flight);
-    private priceHistoryRepository = getRepository(PriceHistory);
+    private flightRepository = AppDataSource.getRepository(Flight);
+    private priceHistoryRepository = AppDataSource.getRepository(PriceHistory);
 
     async updatePriceHistory(flight: Flight, newPrice: number): Promise<void> {
         // Create new price history record

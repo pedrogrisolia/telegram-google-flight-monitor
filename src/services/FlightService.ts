@@ -1,8 +1,8 @@
-import { getRepository } from 'typeorm';
+import { AppDataSource } from '../config/database';
 import { Flight } from '../entities/Flight';
 
 export class FlightService {
-    private flightRepository = getRepository(Flight);
+    private flightRepository = AppDataSource.getRepository(Flight);
 
     async findOrCreateFlight(details: {
         origin: string;
