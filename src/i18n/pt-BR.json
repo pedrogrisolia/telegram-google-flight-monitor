@@ -36,7 +36,7 @@
   "dateRangeOptionPlusMinus3Days": "±3 dias",
   "dateRangeOptionPlusMinus4Days": "±4 dias",
   "dateRangeOptionPlusMinus5Days": "±5 dias",
-  "priceAlert": "<b>Alerta de Preço ${emoji}</b>\n\n<b>Rota:</b> ${origin} ✈️ ${destination}\n<b>Data:</b> ${date}\n━━━━━━━━━━━━━━━\n${trend} em:\n💰 R$ ${priceChange} (${percentage}%)\n\n<b>Preço Anterior:</b> <del>R$${oldPrice}</del>\n<b>Preço Atual:</b> R$${newPrice}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 Ver no Google Flights</a>",
+  "priceAlert": "<b>Alerta de Preço ${emoji}</b>\n\n<b>Rota:</b> ${origin} ✈️ ${destination}\n<b>Data:</b> ${date}\n━━━━━━━━━━━━━━━\n${trend} em:\n💰 R$ ${priceChange} (${percentage}%)\n\n<b>Preço Anterior:</b> <del>R$${oldPrice}</del>\n<b>Preço Atual:</b> R$${newPrice}\n\n${isLowest ? '🌟 Este é o menor preço que já vimos!' : ''}${isHighest ? '⚠️ Este é o maior preço que já vimos!' : ''}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 Ver no Google Flights</a>",
   "priceIncreased": "📈 Aumentou",
   "priceDecreased": "📉 Diminuiu",
   "tripListItem": "<b>${index}.</b> ${origin} ✈️ ${destination}\n<b>Data:</b> ${date}\n<b>Menor preço:</b> R$ ${price}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 Ver no Google Flights</a>",

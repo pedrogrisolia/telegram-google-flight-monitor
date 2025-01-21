@@ -4,6 +4,8 @@ import { Flight } from "../entities/Flight";
 import * as dotenv from "dotenv";
 import { GoogleFlightsService } from "./GoogleFlightsService";
 import { User } from "../entities/User";
+import { ChartService } from "./ChartService";
+import { PriceHistory } from "../entities/PriceHistory";
 import { Trip } from "../entities/Trip";
 import en from "../i18n/en.json";
 import ptBR from "../i18n/pt-BR.json";
@@ -465,6 +467,24 @@ export class TelegramService {
                         const language = (await AppDataSource.manager.findOne(User, { where: { id: trip.userId } }))?.language || 'en';
                         const trend = getTranslation(trendKey, language);
 
+                        // Get price history data
+                        const priceHistory = await AppDataSource.manager
+                            .createQueryBuilder(PriceHistory, 'ph')
+                            .leftJoin('ph.flight', 'flight')
+                            .leftJoin('flight.trip', 'trip')
+                            .where('trip.id = :tripId', { tripId: trip.id })
+                            .orderBy('ph.timestamp', 'ASC')
+                            .getMany();
+
+                        // Generate chart using all price history data
+                        const chartBuffer = await ChartService.generatePriceHistoryChart(priceHistory);
+
+                        // Check if new price is lowest/highest
+                        const allPrices = priceHistory.map(ph => ph.price);
+                        const isLowest = newLowestPrice === Math.min(...allPrices);
+                        const isHighest = newLowestPrice === Math.max(...allPrices);
+                        
+                        // Format message
                         const message = getTranslation("priceAlert", language, {
                             emoji,
                             origin: trip.flights[0].origin,
@@ -475,12 +495,15 @@ export class TelegramService {
                             percentage: absolutePercentageChange,
                             oldPrice: oldLowestPrice,
                             newPrice: newLowestPrice,
-                            url: trip.url
+                            url: trip.url,
+                            isLowest: isLowest ? 'true' : 'false',
+                            isHighest: isHighest ? 'true' : 'false'
                         });
 
-                        await this.bot.sendMessage(trip.userId, message, {
-                            parse_mode: 'HTML',
-                            disable_web_page_preview: true
+                        // Send message with chart
+                        await this.bot.sendPhoto(trip.userId, chartBuffer, {
+                            caption: message,
+                            parse_mode: 'HTML'
                         });
 
                         console.log(getTranslation("notifiedUserMessage", "en", { userId: trip.userId, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));

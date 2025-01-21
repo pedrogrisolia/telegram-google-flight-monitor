@@ -1,4 +1,7 @@
 import puppeteer from 'puppeteer';
+import { getRepository } from 'typeorm';
+import { Flight } from '../entities/Flight';
+import { PriceHistory } from '../entities/PriceHistory';
 
 export interface StopDetails {
     airport: string;
@@ -22,6 +25,31 @@ export interface FlightDetails {
 }
 
 export class GoogleFlightsService {
+
+    private static async updatePriceHistory(flight: Flight, newPrice: number): Promise<void> {
+        const flightRepository = getRepository(Flight);
+        const priceHistoryRepository = getRepository(PriceHistory);
+        
+        // Create new price history record
+        const priceHistory = new PriceHistory();
+        priceHistory.price = newPrice;
+        priceHistory.flight = flight;
+        await priceHistoryRepository.save(priceHistory);
+
+        // Update min/max prices
+        if (flight.minPrice === undefined || newPrice < flight.minPrice) {
+            flight.minPrice = newPrice;
+        }
+        if (flight.maxPrice === undefined || newPrice > flight.maxPrice) {
+            flight.maxPrice = newPrice;
+        }
+
+        // Update previous price
+        flight.previousPrice = flight.currentPrice;
+        flight.currentPrice = newPrice;
+
+        await flightRepository.save(flight);
+    }
 
     private static validateGoogleFlightsUrl(url: string): boolean {
         try {
@@ -86,6 +114,7 @@ export class GoogleFlightsService {
     }
 
     static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
+        const flightRepository = getRepository(Flight);
         const underscoreCount = this.countUnderscores(url);
         console.log(`URL has ${underscoreCount} underscores`);
 
@@ -97,10 +126,42 @@ export class GoogleFlightsService {
                     throw new Error('Invalid Google Flights URL');
                 }
                 const results = await this.scrapeFlightPrices(urlWith11);
-                return results.map(result => ({
+                // Find or create flight entity
+                const flight = await flightRepository.findOne({
+                    where: {
+                        origin: results[0].origin,
+                        destination: results[0].destination,
+                        departureTime: results[0].departureTime
+                    }
+                }) || new Flight();
+
+                // Update flight details
+                flight.origin = results[0].origin;
+                flight.destination = results[0].destination;
+                flight.departureTime = results[0].departureTime;
+                flight.arrivalTime = results[0].arrivalTime;
+                flight.duration = results[0].duration;
+                flight.airline = results[0].airline;
+                flight.stops = results[0].stops;
+                flight.stopDetails = results[0].stopDetails;
+
+                // Update price history for each result
+                for (const result of results) {
+                    await this.updatePriceHistory(flight, result.price);
+                }
+
+                return await Promise.all(results.map(async result => ({
                     ...result,
-                    successfulUrl: urlWith11
-                }));
+                    successfulUrl: urlWith11,
+                    minPrice: flight.minPrice,
+                    maxPrice: flight.maxPrice,
+                    priceHistory: (await flightRepository
+                        .createQueryBuilder('flight')
+                        .leftJoinAndSelect('flight.priceHistory', 'priceHistory')
+                        .where('flight.id = :id', { id: flight.id })
+                        .orderBy('priceHistory.timestamp', 'ASC')
+                        .getOne())?.priceHistory || []
+                })));
             } catch (error11) {
                 console.log("Failed with 11 underscores, trying with 12...");
                 console.error(error11);
@@ -127,10 +188,42 @@ export class GoogleFlightsService {
                     throw new Error('Invalid Google Flights URL');
                 }
                 const results = await this.scrapeFlightPrices(url);
-                return results.map(result => ({
+                // Find or create flight entity
+                const flight = await flightRepository.findOne({
+                    where: {
+                        origin: results[0].origin,
+                        destination: results[0].destination,
+                        departureTime: results[0].departureTime
+                    }
+                }) || new Flight();
+
+                // Update flight details
+                flight.origin = results[0].origin;
+                flight.destination = results[0].destination;
+                flight.departureTime = results[0].departureTime;
+                flight.arrivalTime = results[0].arrivalTime;
+                flight.duration = results[0].duration;
+                flight.airline = results[0].airline;
+                flight.stops = results[0].stops;
+                flight.stopDetails = results[0].stopDetails;
+
+                // Update price history for each result
+                for (const result of results) {
+                    await this.updatePriceHistory(flight, result.price);
+                }
+
+                return await Promise.all(results.map(async result => ({
                     ...result,
-                    successfulUrl: url
-                }));
+                    successfulUrl: url,
+                    minPrice: flight.minPrice,
+                    maxPrice: flight.maxPrice,
+                    priceHistory: (await flightRepository
+                        .createQueryBuilder('flight')
+                        .leftJoinAndSelect('flight.priceHistory', 'priceHistory')
+                        .where('flight.id = :id', { id: flight.id })
+                        .orderBy('priceHistory.timestamp', 'ASC')
+                        .getOne())?.priceHistory || []
+                })));
             } catch (error11) {
                 console.log("Failed with original 11 underscores, trying with 12...");
                 try {
@@ -139,10 +232,42 @@ export class GoogleFlightsService {
                         throw new Error('Invalid Google Flights URL');
                     }
                     const results = await this.scrapeFlightPrices(urlWith12);
-                    return results.map(result => ({
-                        ...result,
-                        successfulUrl: urlWith12
-                    }));
+                // Find or create flight entity
+                const flight = await flightRepository.findOne({
+                    where: {
+                        origin: results[0].origin,
+                        destination: results[0].destination,
+                        departureTime: results[0].departureTime
+                    }
+                }) || new Flight();
+
+                // Update flight details
+                flight.origin = results[0].origin;
+                flight.destination = results[0].destination;
+                flight.departureTime = results[0].departureTime;
+                flight.arrivalTime = results[0].arrivalTime;
+                flight.duration = results[0].duration;
+                flight.airline = results[0].airline;
+                flight.stops = results[0].stops;
+                flight.stopDetails = results[0].stopDetails;
+
+                // Update price history for each result
+                for (const result of results) {
+                    await this.updatePriceHistory(flight, result.price);
+                }
+
+                return await Promise.all(results.map(async result => ({
+                    ...result,
+                    successfulUrl: urlWith12,
+                    minPrice: flight.minPrice,
+                    maxPrice: flight.maxPrice,
+                    priceHistory: (await flightRepository
+                        .createQueryBuilder('flight')
+                        .leftJoinAndSelect('flight.priceHistory', 'priceHistory')
+                        .where('flight.id = :id', { id: flight.id })
+                        .orderBy('priceHistory.timestamp', 'ASC')
+                        .getOne())?.priceHistory || []
+                })));
                 } catch (error12) {
                     throw error11;
                 }

@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from "typeorm";
 import { Trip } from "./Trip";
+import { PriceHistory } from "./PriceHistory";
 
 export interface StopDetails {
     airport: string;
@@ -42,9 +43,18 @@ export class Flight {
     @Column("float", { nullable: true })
     previousPrice?: number;
 
+    @Column("float", { nullable: true })
+    minPrice?: number;
+
+    @Column("float", { nullable: true })
+    maxPrice?: number;
+
+    @OneToMany(() => PriceHistory, priceHistory => priceHistory.flight)
+    priceHistory!: PriceHistory[];
+
     @Column({ default: 1 })
     passengers!: number;
 
     @Column("simple-json", { nullable: true })
     stopDetails?: StopDetails[];
-} 
+}
