@@ -44,5 +44,7 @@
   "languageSelectionMessage": "🌎 Por favor, selecione seu idioma:",
   "languageChangedMessage": "✅ Idioma alterado para Português",
   "languageEnglish": "🇺🇸 Inglês",
-  "languagePortuguese": "🇧🇷 Português"
+  "languagePortuguese": "🇧🇷 Português",
+    "newLowestHistoricalPrice": "🏆 Esse é o preço mais baixo já registrado para essa viagem!",
+  "newHighestHistoricalPrice": "⚠️ Esse é o preço mais alto já registrado para essa viagem!"
 }

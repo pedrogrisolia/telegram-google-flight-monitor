@@ -7,6 +7,7 @@ import { User } from "../entities/User";
 import { Trip } from "../entities/Trip";
 import en from "../i18n/en.json";
 import ptBR from "../i18n/pt-BR.json";
+import { PriceHistory } from "../entities/PriceHistory";
 
 dotenv.config();
 
@@ -435,6 +436,10 @@ export class TelegramService {
                     const newLowestPrice = Math.min(...newFlights.map(f => f.price));
                     console.log(getTranslation("newLowestPriceMessage", "en", { newLowestPrice }));
 
+
+
+
+
                     // Update existing flights with new data
                     for (let i = 0; i < trip.flights.length; i++) {
                         if (newFlights[i]) {
@@ -465,6 +470,25 @@ export class TelegramService {
                         const language = (await AppDataSource.manager.findOne(User, { where: { id: trip.userId } }))?.language || 'en';
                         const trend = getTranslation(trendKey, language);
 
+                        // Get historical prices for comparison
+                        const tripWithHistory = await AppDataSource.manager.findOne(Trip, {
+                            where: { id: trip.id },
+                            relations: ['priceHistory']
+                        });
+
+                        let priceExtremesMessage = '';
+                        if (tripWithHistory?.priceHistory.length) {
+                            const historicalPrices = tripWithHistory.priceHistory.map(h => h.price);
+                            const historicalLowest = Math.min(...historicalPrices);
+                            const historicalHighest = Math.max(...historicalPrices);
+
+                            if (newLowestPrice < historicalLowest) {
+                                priceExtremesMessage = getTranslation("newLowestHistoricalPrice", language);
+                            } else if (newLowestPrice > historicalHighest) {
+                                priceExtremesMessage = getTranslation("newHighestHistoricalPrice", language);
+                            }
+                        }
+
                         const message = getTranslation("priceAlert", language, {
                             emoji,
                             origin: trip.flights[0].origin,
@@ -475,7 +499,8 @@ export class TelegramService {
                             percentage: absolutePercentageChange,
                             oldPrice: oldLowestPrice,
                             newPrice: newLowestPrice,
-                            url: trip.url
+                            url: trip.url,
+                            priceExtremesMessage: priceExtremesMessage ? `\n${priceExtremesMessage}` : ''
                         });
 
                         await this.bot.sendMessage(trip.userId, message, {
@@ -485,6 +510,16 @@ export class TelegramService {
 
                         console.log(getTranslation("notifiedUserMessage", "en", { userId: trip.userId, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));
                     }
+
+                    // Create price history entry if price changed
+                    if (newLowestPrice !== oldLowestPrice) {
+                        const priceHistory = new PriceHistory();
+                        priceHistory.price = newLowestPrice;
+                        priceHistory.trip = trip;
+                        await AppDataSource.manager.save(priceHistory);
+                        console.log(`Saved new price point R$ ${newLowestPrice} to history`);
+                    }
+
                 } catch (error: Error | any) {
                     console.error(getTranslation("failedToCheckPricesMessage", "en", { tripId: trip.id }), error);
                     if (error?.message?.includes("Failed to launch the browser process!")) {

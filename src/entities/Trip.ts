@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne } from "typeorm";
 import { Flight } from "./Flight";
 import { User } from "./User";
+import { PriceHistory } from "./PriceHistory";
 
 @Entity()
 export class Trip {
@@ -30,4 +31,7 @@ export class Trip {
 
     @OneToMany(() => Flight, flight => flight.trip, { cascade: true })
     flights!: Flight[];
-} 
+
+    @OneToMany(() => PriceHistory, priceHistory => priceHistory.trip, { cascade: true })
+    priceHistory!: PriceHistory[];
+}
