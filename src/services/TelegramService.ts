@@ -8,6 +8,7 @@ import { Trip } from "../entities/Trip";
 import en from "../i18n/en.json";
 import ptBR from "../i18n/pt-BR.json";
 import { PriceHistory } from "../entities/PriceHistory";
+import { ChartService } from './ChartService';
 
 dotenv.config();
 
@@ -503,12 +504,28 @@ export class TelegramService {
                             priceExtremesMessage: priceExtremesMessage ? `\n${priceExtremesMessage}` : ''
                         });
 
+                        // Send price alert message
                         await this.bot.sendMessage(trip.userId, message, {
                             parse_mode: 'HTML',
                             disable_web_page_preview: true
                         });
 
-                        console.log(getTranslation("notifiedUserMessage", "en", { userId: trip.userId, origin: trip.flights[0].origin, destination: trip.flights[0].destination, date: trip.date }));
+                        // Generate price history chart
+                        if (tripWithHistory && tripWithHistory?.priceHistory?.length > 1) {
+                            const chartBuffer = await ChartService.generatePriceHistoryChart(tripWithHistory.priceHistory);
+                            
+                            // Send chart image first
+                            await this.bot.sendPhoto(trip.userId, chartBuffer, {
+                                caption: getTranslation("priceHistoryChartCaption", language)
+                            });
+                        }
+
+                        console.log(getTranslation("notifiedUserMessage", "en", { 
+                            userId: trip.userId, 
+                            origin: trip.flights[0].origin, 
+                            destination: trip.flights[0].destination, 
+                            date: trip.date 
+                        }));
                     }
 
                     // Create price history entry if price changed

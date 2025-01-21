@@ -46,5 +46,6 @@
   "languageEnglish": "🇺🇸 English",
   "languagePortuguese": "🇧🇷 Portuguese",
   "newLowestHistoricalPrice": "🏆 This is the lowest price recorded for this trip!",
-  "newHighestHistoricalPrice": "⚠️ This is the highest price recorded for this trip!"
+  "newHighestHistoricalPrice": "⚠️ This is the highest price recorded for this trip!",
+  "priceHistoryChartCaption": "📈 Price variation over time"
 }

@@ -45,6 +45,7 @@
   "languageChangedMessage": "✅ Idioma alterado para Português",
   "languageEnglish": "🇺🇸 Inglês",
   "languagePortuguese": "🇧🇷 Português",
-    "newLowestHistoricalPrice": "🏆 Esse é o preço mais baixo já registrado para essa viagem!",
-  "newHighestHistoricalPrice": "⚠️ Esse é o preço mais alto já registrado para essa viagem!"
+  "newLowestHistoricalPrice": "🏆 Esse é o preço mais baixo já registrado para essa viagem!",
+  "newHighestHistoricalPrice": "⚠️ Esse é o preço mais alto já registrado para essa viagem!",
+  "priceHistoryChartCaption": "📈 Variação de preço ao longo do tempo"
 }
