@@ -458,6 +458,16 @@ export class TelegramService {
                     const savedFligths = await AppDataSource.manager.save(trip.flights);
                     console.log(getTranslation("updatedFlightsMessage", "en", { count: savedFligths.length }));
 
+
+                    // Create price history entry if price changed
+                    if (newLowestPrice !== oldLowestPrice) {
+                        const priceHistory = new PriceHistory();
+                        priceHistory.price = newLowestPrice;
+                        priceHistory.trip = trip;
+                        await AppDataSource.manager.save(priceHistory);
+                        console.log(`Saved new price point R$ ${newLowestPrice} to history`);
+                    }
+
                     // Calculate price change percentage
                     const priceChange = newLowestPrice - oldLowestPrice;
                     const percentageChange = ((priceChange / oldLowestPrice) * 100).toFixed(1);
@@ -483,9 +493,9 @@ export class TelegramService {
                             const historicalLowest = Math.min(...historicalPrices);
                             const historicalHighest = Math.max(...historicalPrices);
 
-                            if (newLowestPrice < historicalLowest) {
+                            if (newLowestPrice <= historicalLowest) {
                                 priceExtremesMessage = getTranslation("newLowestHistoricalPrice", language);
-                            } else if (newLowestPrice > historicalHighest) {
+                            } else if (newLowestPrice >= historicalHighest) {
                                 priceExtremesMessage = getTranslation("newHighestHistoricalPrice", language);
                             }
                         }
@@ -528,14 +538,6 @@ export class TelegramService {
                         }));
                     }
 
-                    // Create price history entry if price changed
-                    if (newLowestPrice !== oldLowestPrice) {
-                        const priceHistory = new PriceHistory();
-                        priceHistory.price = newLowestPrice;
-                        priceHistory.trip = trip;
-                        await AppDataSource.manager.save(priceHistory);
-                        console.log(`Saved new price point R$ ${newLowestPrice} to history`);
-                    }
 
                 } catch (error: Error | any) {
                     console.error(getTranslation("failedToCheckPricesMessage", "en", { tripId: trip.id }), error);
