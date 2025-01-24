@@ -514,19 +514,22 @@ export class TelegramService {
                             priceExtremesMessage: priceExtremesMessage ? `\n${priceExtremesMessage}` : ''
                         });
 
-                        // Send price alert message
-                        await this.bot.sendMessage(trip.userId, message, {
-                            parse_mode: 'HTML',
-                            disable_web_page_preview: true
-                        });
+
 
                         // Generate price history chart
                         if (tripWithHistory && tripWithHistory?.priceHistory?.length > 1) {
                             const chartBuffer = await ChartService.generatePriceHistoryChart(tripWithHistory.priceHistory);
                             
-                            // Send chart image first
+                            // Send chart image with alert message
                             await this.bot.sendPhoto(trip.userId, chartBuffer, {
-                                caption: getTranslation("priceHistoryChartCaption", language)
+                                caption: message,
+                                parse_mode: 'HTML'
+                            });
+                        } else {
+                            // Send price alert message
+                            await this.bot.sendMessage(trip.userId, message, {
+                                parse_mode: 'HTML',
+                                disable_web_page_preview: true
                             });
                         }
 
