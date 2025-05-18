@@ -1,5 +1,5 @@
 # Stage 1: build
-FROM node:20-slim AS builder
+FROM telegram-base:latest AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: runtime
-FROM node:20-slim
+FROM telegram-base:latest
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \

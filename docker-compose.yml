@@ -18,6 +18,7 @@ services:
       - db
     environment:
       MYSQL_URL: "mysql://botuser:botpassword@db:3306/flight_monitor"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
     ports:
       - "3000:3000"
 volumes:
