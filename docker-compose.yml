@@ -1,0 +1,24 @@
+version: "3.8"
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: botpassword
+      MYSQL_DATABASE: flight_monitor
+      MYSQL_USER: botuser
+      MYSQL_PASSWORD: botpassword
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      MYSQL_URL: "mysql://botuser:botpassword@db:3306/flight_monitor"
+    ports:
+      - "3000:3000"
+volumes:
+  db_data:
