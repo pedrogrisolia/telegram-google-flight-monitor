@@ -2,7 +2,7 @@ services:
   - type: web
     name: telegram-flight-monitor-bot
     env: docker
-    image: pedrogrisolia/telegram-flight-monitor-bot:latest
+    dockerImage: pedrogrisolia/telegram-flight-monitor-bot:latest
     plan: starter
     autoDeploy: true
     envVars:
