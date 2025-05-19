@@ -69,12 +69,16 @@ export class TelegramService {
       date?: string;
       passengers?: number;
       url?: string; // Store URL while waiting for date range selection
+      price?: number;
     }
   > = new Map();
 
   constructor() {
     this.bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN || "", {
       polling: true,
+    });
+    this.bot.on("polling_error", (error) => {
+      console.error("[polling_error]", error);
     });
 
     // Update bot commands to include language command
@@ -182,10 +186,20 @@ export class TelegramService {
         if (flights.length > 0) {
           state.url = flights[0].successfulUrl;
           state.date = flights[0].date;
+          state.origin = flights[0].origin;
+          state.destination = flights[0].destination;
+          state.price = Math.min(...flights.map((f) => f.price));
           state.step = "AWAITING_DATE_RANGE";
 
           // Offer date range options
-          await this.offerDateRangeOptions(chatId, flights[0].date, language);
+          await this.offerDateRangeOptions(
+            chatId,
+            state.date,
+            language,
+            state.origin!,
+            state.destination!,
+            state.price!
+          );
         } else {
           throw new Error("No flights found");
         }
@@ -203,7 +217,10 @@ export class TelegramService {
   private async offerDateRangeOptions(
     chatId: number,
     date: string,
-    language: string
+    language: string,
+    origin: string,
+    destination: string,
+    price: number
   ) {
     const keyboard = [
       [
@@ -270,7 +287,12 @@ export class TelegramService {
 
     await this.bot.sendMessage(
       chatId,
-      getTranslation("dateConfirmationMessage", language, { date }),
+      getTranslation("dateConfirmationMessage", language, {
+        date,
+        origin,
+        destination,
+        price,
+      }),
       {
         reply_markup: {
           inline_keyboard: keyboard,
@@ -507,6 +529,12 @@ export class TelegramService {
 
             // Save trip with flights
             await AppDataSource.manager.save(trip);
+            // Save initial price history entry
+            const initialLowestPrice = Math.min(...flights.map((f) => f.price));
+            const priceHistoryEntry = new PriceHistory();
+            priceHistoryEntry.price = initialLowestPrice;
+            priceHistoryEntry.trip = trip;
+            await AppDataSource.manager.save(priceHistoryEntry);
             successCount++;
           }
         } catch (error) {
