@@ -2,8 +2,7 @@ services:
   - type: web
     name: telegram-flight-monitor-bot
     env: docker
-    dockerImage: pedrogrisolia/telegram-flight-monitor-bot:latest
-    plan: starter
+    image: pedrogrisolia/telegram-flight-monitor-bot:latest
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
