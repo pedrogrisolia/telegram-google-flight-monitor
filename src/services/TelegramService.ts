@@ -74,9 +74,12 @@ export class TelegramService {
   > = new Map();
 
   constructor() {
-    this.bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN || "", {
-      polling: true,
-    });
+    const token = process.env.TELEGRAM_BOT_TOKEN || "";
+    const webhookUrl = process.env.WEBHOOK_URL;
+    this.bot = new TelegramBot(token, { polling: !webhookUrl });
+    if (webhookUrl) {
+      this.bot.setWebHook(`${webhookUrl}/bot${token}`);
+    }
     this.bot.on("polling_error", (error) => {
       console.error("[polling_error]", error);
     });
@@ -938,5 +941,9 @@ export class TelegramService {
         getTranslation("stopErrorMessage", language)
       );
     }
+  }
+
+  public handleWebhookUpdate(update: any) {
+    this.bot.processUpdate(update);
   }
 }

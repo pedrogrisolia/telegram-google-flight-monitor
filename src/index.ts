@@ -34,9 +34,22 @@ async function main() {
   try {
     // Create a basic HTTP server for health checks first
     const server = http.createServer((req, res) => {
+      const token = process.env.TELEGRAM_BOT_TOKEN;
       if (req.url === "/health") {
         res.writeHead(200);
         res.end("OK");
+      } else if (req.method === "POST" && req.url === `/bot${token}`) {
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", () => {
+          try {
+            telegramService.handleWebhookUpdate(JSON.parse(body));
+          } catch (err) {
+            console.error("Webhook handling error:", err);
+          }
+          res.writeHead(200);
+          res.end("OK");
+        });
       } else {
         res.writeHead(404);
         res.end();
