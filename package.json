@@ -17,6 +17,7 @@
     "mysql2": "^3.6.0",
     "node-schedule": "^2.1.1",
     "node-telegram-bot-api": "^0.64.0",
+    "pg": "^8.16.0",
     "puppeteer": "^19.11.1",
     "reflect-metadata": "^0.1.13",
     "sqlite3": "^5.1.7",
