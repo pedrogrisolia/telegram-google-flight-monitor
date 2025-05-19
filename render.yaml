@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: telegram-flight-monitor-bot
+    env: docker
+    image: pedrogrisolia/telegram-flight-monitor-bot:latest
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromSecret: DATABASE_URL
+      - key: TELEGRAM_BOT_TOKEN
+        fromSecret: TELEGRAM_BOT_TOKEN
+      - key: CHECK_INTERVAL
+        value: "10"
