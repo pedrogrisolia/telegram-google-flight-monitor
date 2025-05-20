@@ -31,11 +31,11 @@ export class KayakCarService {
     try {
       await page.setExtraHTTPHeaders({ "Accept-Language": "pt-BR,pt;q=0.9" });
       await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-      await page.waitForSelector(".js-result.jo6g-car-result-item", {
-        timeout: 15000,
+      await page.waitForSelector(".QYm5", {
+        timeout: 30000,
       });
       const result = await page.evaluate((pageUrl: string) => {
-        const el = document.querySelector(".js-result.jo6g-car-result-item");
+        const el = document.querySelector(".QYm5");
         if (!el) return null;
         const img = el.querySelector("img.js-image.TbiT-pres-default");
         const title =
@@ -48,6 +48,7 @@ export class KayakCarService {
         const priceText = priceMatch
           ? priceMatch[0].replace(/[^0-9,]/g, "").replace(",", ".")
           : "0";
+        console.log(title, priceText, pageUrl, text);
         return { title, price: parseFloat(priceText), url: pageUrl };
       }, url);
       await page.close();

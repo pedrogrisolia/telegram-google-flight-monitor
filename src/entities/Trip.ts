@@ -5,33 +5,41 @@ import { PriceHistory } from "./PriceHistory";
 
 @Entity()
 export class Trip {
-    @PrimaryGeneratedColumn()
-    id!: number;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-    @Column()
-    userId!: number;
+  @Column({
+    type: "bigint",
+    transformer: {
+      to: (value: number) => value.toString(),
+      from: (value: string) => parseInt(value, 10),
+    },
+  })
+  userId!: number;
 
-    @ManyToOne(() => User)
-    user!: User;
+  @ManyToOne(() => User)
+  user!: User;
 
-    @Column()
-    url!: string;
+  @Column()
+  url!: string;
 
-    @Column()
-    date!: string;
+  @Column()
+  date!: string;
 
-    @Column({ default: true })
-    isActive!: boolean;
+  @Column({ default: true })
+  isActive!: boolean;
 
-    @CreateDateColumn()
-    createdAt!: Date;
+  @CreateDateColumn()
+  createdAt!: Date;
 
-    @UpdateDateColumn()
-    updatedAt!: Date;
+  @UpdateDateColumn()
+  updatedAt!: Date;
 
-    @OneToMany(() => Flight, flight => flight.trip, { cascade: true })
-    flights!: Flight[];
+  @OneToMany(() => Flight, (flight) => flight.trip, { cascade: true })
+  flights!: Flight[];
 
-    @OneToMany(() => PriceHistory, priceHistory => priceHistory.trip, { cascade: true })
-    priceHistory!: PriceHistory[];
+  @OneToMany(() => PriceHistory, (priceHistory) => priceHistory.trip, {
+    cascade: true,
+  })
+  priceHistory!: PriceHistory[];
 }

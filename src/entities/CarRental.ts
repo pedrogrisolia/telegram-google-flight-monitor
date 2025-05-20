@@ -15,7 +15,13 @@ export class CarRental {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({
+    type: "bigint",
+    transformer: {
+      to: (value: number) => value.toString(),
+      from: (value: string) => parseInt(value, 10),
+    },
+  })
   userId!: number;
 
   @ManyToOne(() => User)

@@ -3,12 +3,18 @@ import { Trip } from "./Trip";
 
 @Entity()
 export class User {
-    @PrimaryColumn()
-    id!: number;
+  @PrimaryColumn({
+    type: "bigint",
+    transformer: {
+      to: (value: number) => value.toString(),
+      from: (value: string) => parseInt(value, 10),
+    },
+  })
+  id!: number;
 
-    @Column({ type: 'varchar', length: 5, default: 'en' })
-    language!: string;
+  @Column({ type: "varchar", length: 5, default: "en" })
+  language!: string;
 
-    @OneToMany(() => Trip, trip => trip.user)
-    trips!: Trip[];
+  @OneToMany(() => Trip, (trip) => trip.user)
+  trips!: Trip[];
 }
