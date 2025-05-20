@@ -1,10 +1,11 @@
-import { Entity, PrimaryColumn, Column, OneToMany } from "typeorm";
+import { Entity, Column, OneToMany } from "typeorm";
 import { Trip } from "./Trip";
 
 @Entity()
 export class User {
-  @PrimaryColumn({
+  @Column({
     type: "bigint",
+    nullable: true,
     transformer: {
       to: (value: number) => value.toString(),
       from: (value: string) => parseInt(value, 10),
