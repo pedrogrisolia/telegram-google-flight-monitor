@@ -51,5 +51,18 @@
   "languagePortuguese": "🇧🇷 Português",
   "newLowestHistoricalPrice": "🏆 Esse é o preço mais baixo já registrado para essa viagem!",
   "newHighestHistoricalPrice": "⚠️ Esse é o preço mais alto já registrado para essa viagem!",
-  "priceHistoryChartCaption": "📈 Variação de preço ao longo do tempo"
+  "priceHistoryChartCaption": "📈 Variação de preço ao longo do tempo",
+  "selectCarAirport": "Selecione o aeroporto de retirada de carro:",
+  "selectCarAirportMore": "Selecione o aeroporto de retirada de carro (mais opções):",
+  "askCarStartDate": "Informe a data de início (YYYY-MM-DD):",
+  "askCarEndDate": "Informe a data de término (YYYY-MM-DD):",
+  "carMonitorSetupSuccess": "✅ Monitoramento de aluguel de carro configurado: ${title} por R$ ${price} no aeroporto ${airportCode} de ${startDate} a ${endDate}.",
+  "carMonitorSetupError": "Desculpe, ocorreu um erro ao configurar o monitoramento de aluguel de carro.",
+  "startingCarPriceCheckMessage": "Iniciando a verificação de preços de aluguel de carro para todos os monitoramentos ativos...",
+  "carPriceAlert": "<b>Alerta de Preço de Carro ${emoji}</b>\n\n<b>Aeroporto:</b> ${airportCode}\n<b>Período:</b> ${startDate} → ${endDate}\n━━━━━━━━━━━━━━━\n${trend} em:\n💰 R$ ${priceChange} (${percentage}%)\n\n<b>Preço Anterior:</b> <del>R$${oldPrice}</del>\n<b>Preço Atual:</b> R$${newPrice}${priceExtremesMessage}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 Ver no Kayak</a>",
+  "listCarsMessage": "Você tem ${count} aluguel(es) de carro monitorado(s):",
+  "noActiveCarMonitorsMessage": "Você não tem nenhum monitoramento de aluguel de carro ativo.",
+  "stopCarMonitorPrompt": "Qual monitoramento de aluguel de carro você gostaria de parar?\nSelecione na lista abaixo:",
+  "stoppedCarMonitoringMessage": "✅ Parou de monitorar aluguel de carro no aeroporto ${airportCode} de ${startDate} a ${endDate}.",
+  "stopCarErrorMessage": "Desculpe, houve um erro ao parar o monitoramento de aluguel de carro."
 }

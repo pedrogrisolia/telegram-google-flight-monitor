@@ -9,6 +9,9 @@ import en from "../i18n/en.json";
 import ptBR from "../i18n/pt-BR.json";
 import { PriceHistory } from "../entities/PriceHistory";
 import { ChartService } from "./ChartService";
+import { CarRental } from "../entities/CarRental";
+import { CarPriceHistory } from "../entities/CarPriceHistory";
+import { KayakCarService, CarRentalDetails } from "./KayakCarService";
 
 dotenv.config();
 
@@ -68,10 +71,68 @@ export class TelegramService {
       destination?: string;
       date?: string;
       passengers?: number;
-      url?: string; // Store URL while waiting for date range selection
+      url?: string;
       price?: number;
+      airportCode?: string;
+      startDate?: string;
+      endDate?: string;
     }
   > = new Map();
+
+  private static BRAZIL_AIRPORTS = [
+    { code: "BSB", label: "Brasília (DF)" },
+    { code: "CGH", label: "São Paulo (SP)" },
+    { code: "GIG", label: "Rio de Janeiro (RJ)" },
+    { code: "SSA", label: "Salvador (BA)" },
+    { code: "FLN", label: "Florianópolis (SC)" },
+    { code: "POA", label: "Porto Alegre (RS)" },
+    { code: "VCP", label: "Campinas (SP)" },
+    { code: "REC", label: "Recife (PE)" },
+    { code: "CWB", label: "Curitiba (PR)" },
+    { code: "BEL", label: "Belém (PA)" },
+    { code: "VIX", label: "Vitória (ES)" },
+    { code: "SDU", label: "Rio de Janeiro (RJ)" },
+    { code: "CGB", label: "Cuiabá (MT)" },
+    { code: "CGR", label: "Campo Grande (MS)" },
+    { code: "FOR", label: "Fortaleza (CE)" },
+    { code: "MCP", label: "Macapá (AP)" },
+    { code: "MGF", label: "Maringá (PR)" },
+    { code: "GYN", label: "Goiânia (GO)" },
+    { code: "NVT", label: "Navegantes (SC)" },
+    { code: "MAO", label: "Manaus (AM)" },
+    { code: "NAT", label: "Natal (RN)" },
+    { code: "BPS", label: "Porto Seguro (BA)" },
+    { code: "MCZ", label: "Maceió (AL)" },
+    { code: "PMW", label: "Palmas (TO)" },
+    { code: "SLZ", label: "São Luís (MA)" },
+    { code: "GRU", label: "Guarulhos (SP)" },
+    { code: "LDB", label: "Londrina (PR)" },
+    { code: "PVH", label: "Porto Velho (RO)" },
+    { code: "RBR", label: "Rio Branco (AC)" },
+    { code: "JOI", label: "Joinville (SC)" },
+    { code: "UDI", label: "Uberlândia (MG)" },
+    { code: "CXJ", label: "Caxias do Sul (RS)" },
+    { code: "IGU", label: "Foz do Iguaçu (PR)" },
+    { code: "THE", label: "Teresina (PI)" },
+    { code: "AJU", label: "Aracaju (SE)" },
+    { code: "JPA", label: "João Pessoa (PB)" },
+    { code: "PNZ", label: "Petrolina (PE)" },
+    { code: "CNF", label: "Belo Horizonte (MG)" },
+    { code: "BVB", label: "Boa Vista (RR)" },
+    { code: "CPV", label: "Campina Grande (PB)" },
+    { code: "STM", label: "Santarém (PA)" },
+    { code: "IOS", label: "Ilhéus (BA)" },
+    { code: "JDO", label: "Juazeiro do Norte (CE)" },
+    { code: "IMP", label: "Imperatriz (MA)" },
+    { code: "XAP", label: "Chapecó (SC)" },
+    { code: "MAB", label: "Marabá (PA)" },
+    { code: "CZS", label: "Cruzeiro do Sul (AC)" },
+    { code: "PPB", label: "Presidente Prudente (SP)" },
+    { code: "CFB", label: "Cabo Frio (RJ)" },
+    { code: "FEN", label: "Fernando de Noronha (PE)" },
+    { code: "JTC", label: "Bauru (SP)" },
+    { code: "MOC", label: "Montes Claros (MG)" },
+  ];
 
   constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -87,9 +148,12 @@ export class TelegramService {
     // Update bot commands to include language command
     this.bot.setMyCommands([
       { command: "start", description: "Start the bot" },
-      { command: "monitor", description: "Monitor a new flight" },
-      { command: "stop", description: "Stop monitoring a flight" },
-      { command: "list", description: "List all monitored flights" },
+      { command: "monitor_flight", description: "Monitor a new flight" },
+      { command: "monitor_car", description: "Monitor a new car rental" },
+      { command: "stop_flights", description: "Stop monitoring flights" },
+      { command: "stop_cars", description: "Stop monitoring car rentals" },
+      { command: "list_flights", description: "List monitored flights" },
+      { command: "list_cars", description: "List monitored car rentals" },
       { command: "language", description: "Change language / Mudar idioma 🌎" },
     ]);
 
@@ -99,9 +163,12 @@ export class TelegramService {
   private setupHandlers() {
     const commandHandlers = [
       { pattern: /\/start/, handler: this.handleStart },
-      { pattern: /\/monitor/, handler: this.startMonitoring },
-      { pattern: /\/stop/, handler: this.handleStopCommand },
-      { pattern: /\/list/, handler: this.handleListCommand },
+      { pattern: /\/monitor_flight/, handler: this.startMonitoring },
+      { pattern: /\/monitor_car/, handler: this.startCarMonitoring },
+      { pattern: /\/stop_flights/, handler: this.handleStopCommand },
+      { pattern: /\/stop_cars/, handler: this.handleStopCarsCommand },
+      { pattern: /\/list_flights/, handler: this.handleListCommand },
+      { pattern: /\/list_cars/, handler: this.handleListCarsCommand },
       { pattern: /\/language/, handler: this.handleLanguageCommand },
     ];
 
@@ -152,6 +219,27 @@ export class TelegramService {
       getTranslation("setupMessage", language)
     );
     this.userStates.set(userId, { step: "AWAITING_URL" });
+  }
+
+  private async startCarMonitoring(msg: TelegramBot.Message) {
+    const chatId = msg.chat.id;
+    const userId = msg.from?.id;
+    if (!userId) return;
+    const language = await this.getUserLanguage(userId);
+    const airports = TelegramService.BRAZIL_AIRPORTS.slice(0, 10);
+    const keyboard = airports.map((a) => [
+      {
+        text: `${a.code} – ${a.label}`,
+        callback_data: `car_airport_${a.code}`,
+      },
+    ]);
+    keyboard.push([{ text: "Ver mais", callback_data: "car_airport_more" }]);
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("selectCarAirport", language),
+      { reply_markup: { inline_keyboard: keyboard } }
+    );
+    this.userStates.set(userId, { step: "AWAITING_CAR_AIRPORT" });
   }
 
   private async handleMessage(msg: TelegramBot.Message) {
@@ -214,6 +302,67 @@ export class TelegramService {
         );
         this.userStates.delete(userId);
       }
+    }
+
+    if (state.step === "AWAITING_CAR_START_DATE") {
+      state.startDate = msg.text!;
+      state.step = "AWAITING_CAR_END_DATE";
+      this.userStates.set(userId, state);
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("askCarEndDate", language)
+      );
+      return;
+    }
+    if (state.step === "AWAITING_CAR_END_DATE") {
+      state.endDate = msg.text!;
+      // Perform scraping and save to DB
+      try {
+        const details: CarRentalDetails = await KayakCarService.getMinCarPrice(
+          state.airportCode!,
+          state.startDate!,
+          state.endDate!
+        );
+        let user = await AppDataSource.manager.findOne(User, {
+          where: { id: userId },
+        });
+        if (!user) {
+          user = new User();
+          user.id = userId;
+          await AppDataSource.manager.save(user);
+        }
+        const rental = new CarRental();
+        rental.userId = userId;
+        rental.user = user;
+        rental.airportCode = state.airportCode!;
+        rental.startDate = state.startDate!;
+        rental.endDate = state.endDate!;
+        rental.url = details.url;
+        rental.lastPrice = details.price;
+        await AppDataSource.manager.save(rental);
+        const history = new CarPriceHistory();
+        history.price = details.price;
+        history.carRental = rental;
+        await AppDataSource.manager.save(history);
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("carMonitorSetupSuccess", language, {
+            title: details.title,
+            price: details.price,
+            airportCode: state.airportCode!,
+            startDate: state.startDate!,
+            endDate: state.endDate!,
+          })
+        );
+      } catch (error) {
+        console.error("Error setting up car monitor:", error);
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("carMonitorSetupError", language)
+        );
+      }
+      this.userStates.delete(userId);
+      return;
     }
   }
 
@@ -333,10 +482,43 @@ export class TelegramService {
       return;
     }
 
+    if (query.data.startsWith("car_airport_")) {
+      const code =
+        query.data === "car_airport_more" ? null : query.data.split("_")[2];
+      if (query.data === "car_airport_more") {
+        const rest = TelegramService.BRAZIL_AIRPORTS.slice(10);
+        const kb = rest.map((a) => [
+          {
+            text: `${a.code} – ${a.label}`,
+            callback_data: `car_airport_${a.code}`,
+          },
+        ]);
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("selectCarAirportMore", language),
+          { reply_markup: { inline_keyboard: kb } }
+        );
+      } else if (code) {
+        const state = this.userStates.get(userId);
+        if (!state) return;
+        state.step = "AWAITING_CAR_START_DATE";
+        state.airportCode = code;
+        this.userStates.set(userId, state);
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("askCarStartDate", language)
+        );
+      }
+      return;
+    }
+
     // Rest of the existing callback query handling
     if (query.data.startsWith("stop_")) {
       const flightId = parseInt(query.data.split("_")[1]);
       await this.stopMonitoring(chatId, userId, flightId, language);
+    } else if (query.data.startsWith("stop_car_")) {
+      const rentalId = parseInt(query.data.split("_")[2]);
+      await this.stopCarMonitoring(chatId, userId, rentalId, language);
     } else if (query.data.startsWith("range_")) {
       const state = this.userStates.get(userId);
       if (
@@ -766,6 +948,93 @@ export class TelegramService {
         }
       }
 
+      // Car rental price check
+      console.log(getTranslation("startingCarPriceCheckMessage", "en"));
+      const activeRentals = await AppDataSource.manager.find(CarRental, {
+        where: { isActive: true },
+        relations: ["priceHistory"],
+      });
+      console.log(`Found ${activeRentals.length} active car rentals to check`);
+      for (const rental of activeRentals) {
+        try {
+          console.log(
+            `Checking car rental ID ${rental.id}: ${rental.airportCode} ${rental.startDate}→${rental.endDate}`
+          );
+          const oldPrice = rental.lastPrice;
+          const details = await KayakCarService.getMinCarPrice(
+            rental.airportCode,
+            rental.startDate,
+            rental.endDate
+          );
+          console.log(`Found price: ${details.price}`);
+          const newPrice = details.price;
+          if (newPrice !== oldPrice) {
+            const historyEntry = new CarPriceHistory();
+            historyEntry.price = newPrice;
+            historyEntry.carRental = rental;
+            await AppDataSource.manager.save(historyEntry);
+            rental.lastPrice = newPrice;
+            await AppDataSource.manager.save(rental);
+            const priceChange = newPrice - oldPrice;
+            const percentageChange = ((priceChange / oldPrice) * 100).toFixed(
+              1
+            );
+            const absPerc = Math.abs(Number(percentageChange));
+            if (absPerc >= 5) {
+              const userLang =
+                (
+                  await AppDataSource.manager.findOne(User, {
+                    where: { id: rental.userId },
+                  })
+                )?.language || "en";
+              const emoji = priceChange > 0 ? "🔴" : "🟢";
+              const trend = getTranslation(
+                priceChange > 0 ? "priceIncreased" : "priceDecreased",
+                userLang
+              );
+              const rentalWithHist = await AppDataSource.manager.findOne(
+                CarRental,
+                { where: { id: rental.id }, relations: ["priceHistory"] }
+              );
+              let extremesMsg = "";
+              if (rentalWithHist?.priceHistory.length) {
+                const prices = rentalWithHist.priceHistory.map((h) => h.price);
+                const lowest = Math.min(...prices);
+                const highest = Math.max(...prices);
+                if (newPrice <= lowest)
+                  extremesMsg = getTranslation(
+                    "newLowestHistoricalPrice",
+                    userLang
+                  );
+                else if (newPrice >= highest)
+                  extremesMsg = getTranslation(
+                    "newHighestHistoricalPrice",
+                    userLang
+                  );
+              }
+              const msgText = getTranslation("carPriceAlert", userLang, {
+                emoji,
+                trend,
+                airportCode: rental.airportCode,
+                startDate: rental.startDate,
+                endDate: rental.endDate,
+                priceChange: Math.abs(priceChange),
+                percentage: absPerc,
+                oldPrice,
+                newPrice,
+                url: details.url,
+                priceExtremesMessage: extremesMsg ? `\n${extremesMsg}` : "",
+              });
+              await this.bot.sendMessage(rental.userId, msgText, {
+                parse_mode: "HTML",
+                disable_web_page_preview: true,
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error checking car rental ID ${rental.id}:`, error);
+        }
+      }
       console.log("\nPrice check completed");
     } catch (error: Error | any) {
       console.error(
@@ -941,6 +1210,102 @@ export class TelegramService {
         getTranslation("stopErrorMessage", language)
       );
     }
+  }
+
+  private async stopCarMonitoring(
+    chatId: number,
+    userId: number,
+    rentalId: number,
+    language: string
+  ) {
+    try {
+      const rental = await AppDataSource.manager.findOne(CarRental, {
+        where: { id: rentalId, userId },
+      });
+      if (!rental) {
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noActiveCarMonitorsMessage", language)
+        );
+        return;
+      }
+      rental.isActive = false;
+      await AppDataSource.manager.save(rental);
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("stoppedCarMonitoringMessage", language, {
+          airportCode: rental.airportCode,
+          startDate: rental.startDate,
+          endDate: rental.endDate,
+        })
+      );
+    } catch (error) {
+      console.error("Error stopping car rental monitor:", error);
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("stopCarErrorMessage", language)
+      );
+    }
+  }
+
+  private async handleListCarsCommand(msg: TelegramBot.Message) {
+    const chatId = msg.chat.id;
+    const userId = msg.from?.id;
+    if (!userId) return;
+    const language = await this.getUserLanguage(userId);
+    const rentals = await AppDataSource.manager.find(CarRental, {
+      where: { userId, isActive: true },
+    });
+    if (rentals.length === 0) {
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("noActiveCarMonitorsMessage", language)
+      );
+      return;
+    }
+    // Send header message
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("listCarsMessage", language, { count: rentals.length })
+    );
+    // Send plain list of car rentals
+    const lines = rentals.map(
+      (r, i) =>
+        `${i + 1}. ${r.airportCode} ${r.startDate}→${r.endDate} – R$ ${
+          r.lastPrice
+        }`
+    );
+    await this.bot.sendMessage(chatId, lines.join("\n"), {
+      disable_web_page_preview: true,
+    });
+  }
+
+  private async handleStopCarsCommand(msg: TelegramBot.Message) {
+    const chatId = msg.chat.id;
+    const userId = msg.from?.id;
+    if (!userId) return;
+    const language = await this.getUserLanguage(userId);
+    const rentals = await AppDataSource.manager.find(CarRental, {
+      where: { userId, isActive: true },
+    });
+    if (rentals.length === 0) {
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("noActiveCarMonitorsMessage", language)
+      );
+      return;
+    }
+    const keyboard = rentals.map((r, i) => [
+      {
+        text: `${i + 1}. ${r.airportCode} ${r.startDate}→${r.endDate}`,
+        callback_data: `stop_car_${r.id}`,
+      },
+    ]);
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("stopCarMonitorPrompt", language),
+      { reply_markup: { inline_keyboard: keyboard } }
+    );
   }
 
   public handleWebhookUpdate(update: any) {

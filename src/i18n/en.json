@@ -51,5 +51,18 @@
   "languagePortuguese": "🇧🇷 Portuguese",
   "newLowestHistoricalPrice": "🏆 This is the lowest price recorded for this trip!",
   "newHighestHistoricalPrice": "⚠️ This is the highest price recorded for this trip!",
-  "priceHistoryChartCaption": "📈 Price variation over time"
+  "priceHistoryChartCaption": "📈 Price variation over time",
+  "selectCarAirport": "Please select the car pickup airport:",
+  "selectCarAirportMore": "Please select the car pickup airport (more options):",
+  "askCarStartDate": "Please enter the start date (YYYY-MM-DD):",
+  "askCarEndDate": "Please enter the end date (YYYY-MM-DD):",
+  "carMonitorSetupSuccess": "✅ Car rental monitoring set up: ${title} for R$ ${price} at airport ${airportCode} from ${startDate} to ${endDate}.",
+  "carMonitorSetupError": "Sorry, there was an error setting up car rental monitoring.",
+  "startingCarPriceCheckMessage": "Starting car rental price check for all active monitors...",
+  "carPriceAlert": "<b>Car Rental Price Alert ${emoji}</b>\n\n<b>Airport:</b> ${airportCode}\n<b>Period:</b> ${startDate} → ${endDate}\n━━━━━━━━━━━━━━━\n${trend} by:\n💰 R$ ${priceChange} (${percentage}%)\n\n<b>Previous Price:</b> <del>R$${oldPrice}</del>\n<b>Current Price:</b> R$${newPrice}${priceExtremesMessage}\n━━━━━━━━━━━━━━━\n<a href=\"${url}\">🔍 View on Kayak</a>",
+  "listCarsMessage": "You have ${count} monitored car rentals:",
+  "noActiveCarMonitorsMessage": "You don't have any active car rental monitors.",
+  "stopCarMonitorPrompt": "Which car rental monitor would you like to stop?\nSelect from the list below:",
+  "stoppedCarMonitoringMessage": "✅ Stopped monitoring car rental at airport ${airportCode} from ${startDate} to ${endDate}.",
+  "stopCarErrorMessage": "Sorry, there was an error stopping the car rental monitor."
 }
