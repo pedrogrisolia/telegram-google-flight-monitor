@@ -191,7 +191,7 @@ export class TelegramService {
 
   private async getUserLanguage(userId: number): Promise<string> {
     const user = await AppDataSource.manager.findOne(User, {
-      where: { id: userId },
+      where: { id: userId.toString() },
     });
     return user?.language || "en";
   }
@@ -321,14 +321,17 @@ export class TelegramService {
         const details: CarRentalDetails = await KayakCarService.getMinCarPrice(
           state.airportCode!,
           state.startDate!,
-          state.endDate!
+          state.endDate!,
+          async (screenshot) => {
+            await this.bot.sendPhoto(chatId, screenshot);
+          }
         );
         let user = await AppDataSource.manager.findOne(User, {
-          where: { id: userId },
+          where: { id: userId.toString() },
         });
         if (!user) {
           user = new User();
-          user.id = userId;
+          user.id = userId.toString();
           await AppDataSource.manager.save(user);
         }
         const rental = new CarRental();
@@ -465,11 +468,11 @@ export class TelegramService {
 
       // Update user language in database
       let user = await AppDataSource.manager.findOne(User, {
-        where: { id: userId },
+        where: { id: userId.toString() },
       });
       if (!user) {
         user = new User();
-        user.id = userId;
+        user.id = userId.toString();
       }
       user.language = newLanguage;
       await AppDataSource.manager.save(user);
@@ -548,7 +551,7 @@ export class TelegramService {
     if (!userId) return;
 
     const user = await AppDataSource.manager.findOne(User, {
-      where: { id: userId },
+      where: { id: userId.toString() },
     });
     const currentLanguage = user?.language || "en";
 
@@ -641,11 +644,11 @@ export class TelegramService {
 
       // Create or find user
       let user = await AppDataSource.manager.findOne(User, {
-        where: { id: userId },
+        where: { id: userId.toString() },
       });
       if (!user) {
         user = new User();
-        user.id = userId;
+        user.id = userId.toString();
         await AppDataSource.manager.save(user);
       }
 
@@ -856,7 +859,7 @@ export class TelegramService {
             const language =
               (
                 await AppDataSource.manager.findOne(User, {
-                  where: { id: trip.userId },
+                  where: { id: trip.userId.toString() },
                 })
               )?.language || "en";
             const trend = getTranslation(trendKey, language);
@@ -964,7 +967,10 @@ export class TelegramService {
           const details = await KayakCarService.getMinCarPrice(
             rental.airportCode,
             rental.startDate,
-            rental.endDate
+            rental.endDate,
+            async (screenshot) => {
+              await this.bot.sendPhoto(rental.userId, screenshot);
+            }
           );
           console.log(`Found price: ${details.price}`);
           const newPrice = details.price;
@@ -984,7 +990,7 @@ export class TelegramService {
               const userLang =
                 (
                   await AppDataSource.manager.findOne(User, {
-                    where: { id: rental.userId },
+                    where: { id: rental.userId.toString() },
                   })
                 )?.language || "en";
               const emoji = priceChange > 0 ? "🔴" : "🟢";

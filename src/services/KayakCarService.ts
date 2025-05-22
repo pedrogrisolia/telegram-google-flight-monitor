@@ -1,4 +1,4 @@
-import puppeteer from "puppeteer";
+import puppeteer, { TimeoutError } from "puppeteer";
 
 export interface CarRentalDetails {
   title: string;
@@ -10,7 +10,8 @@ export class KayakCarService {
   static async getMinCarPrice(
     airportCode: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    onTimeout?: (screenshot: Buffer) => Promise<void>
   ): Promise<CarRentalDetails> {
     const url = `https://www.kayak.com.br/cars/${airportCode}/${startDate}/${endDate}?sort=price_a`;
     const browser = await puppeteer.launch({
@@ -56,6 +57,10 @@ export class KayakCarService {
       if (!result) throw new Error("Nenhum resultado encontrado");
       return result;
     } catch (error) {
+      if (onTimeout && error instanceof TimeoutError) {
+        const screenshot = await page.screenshot({ fullPage: true });
+        await onTimeout(screenshot);
+      }
       await page.close();
       await browser.close();
       throw error;
