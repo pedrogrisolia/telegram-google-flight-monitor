@@ -1,4 +1,9 @@
-import puppeteer, { TimeoutError } from "puppeteer";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import { TimeoutError } from "puppeteer";
+
+// apply stealth plugin to evade detection
+puppeteer.use(StealthPlugin());
 
 export interface CarRentalDetails {
   title: string;
@@ -29,6 +34,20 @@ export class KayakCarService {
       ],
     });
     const page = await browser.newPage();
+    // set human-like headers and viewport
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    );
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+      Object.defineProperty(navigator, "languages", {
+        get: () => ["pt-BR", "en-US"],
+      });
+      Object.defineProperty(navigator, "plugins", {
+        get: () => [1, 2, 3, 4, 5],
+      });
+    });
     try {
       await page.setExtraHTTPHeaders({ "Accept-Language": "pt-BR,pt;q=0.9" });
       await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
