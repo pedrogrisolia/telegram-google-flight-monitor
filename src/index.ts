@@ -5,6 +5,7 @@ import * as dotenv from "dotenv";
 import * as http from "http";
 import { BackupService } from "./services/BackupService";
 import { Trip } from "./entities/Trip";
+import "reflect-metadata";
 
 dotenv.config();
 
