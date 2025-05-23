@@ -33,7 +33,7 @@ export class KayakCarService {
       process.env.CHROME_PATH ||
       "/usr/bin/google-chrome-stable";
     const browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       executablePath: chromeExecutable,
       args: [
         "--no-sandbox",
