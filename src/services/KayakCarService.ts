@@ -1,9 +1,17 @@
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import AnonymizeUAPlugin from "puppeteer-extra-plugin-anonymize-ua";
+import BlockResourcesPlugin from "puppeteer-extra-plugin-block-resources";
 import { TimeoutError } from "puppeteer";
 
-// apply stealth plugin to evade detection
+// apply puppeteer-extra plugins
 puppeteer.use(StealthPlugin());
+puppeteer.use(AnonymizeUAPlugin());
+puppeteer.use(
+  BlockResourcesPlugin({
+    blockedTypes: new Set(["image", "media", "font", "stylesheet"]),
+  })
+);
 
 export interface CarRentalDetails {
   title: string;
@@ -19,11 +27,18 @@ export class KayakCarService {
     onTimeout?: (screenshot: Buffer) => Promise<void>
   ): Promise<CarRentalDetails> {
     const url = `https://www.kayak.com.br/cars/${airportCode}/${startDate}/${endDate}?sort=price_a`;
+    // determine executable path (from Puppeteer env or Docker install)
+    const chromeExecutable =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROME_PATH ||
+      "/usr/bin/google-chrome-stable";
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: false,
+      executablePath: chromeExecutable,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--disable-infobars",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-first-run",
@@ -34,12 +49,13 @@ export class KayakCarService {
       ],
     });
     const page = await browser.newPage();
-    // set human-like headers and viewport
+    // set human-like headers
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     );
     await page.setViewport({ width: 1280, height: 800 });
     await page.evaluateOnNewDocument(() => {
+      // evade webdriver detection
       Object.defineProperty(navigator, "webdriver", { get: () => false });
       Object.defineProperty(navigator, "languages", {
         get: () => ["pt-BR", "en-US"],
@@ -47,6 +63,17 @@ export class KayakCarService {
       Object.defineProperty(navigator, "plugins", {
         get: () => [1, 2, 3, 4, 5],
       });
+      // fake chrome runtime
+      (window as any).chrome = { runtime: {} };
+      // fake platform
+      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+      // fake WebGL vendor and renderer
+      const getParameter = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function (parameter) {
+        if (parameter === 37445) return "Intel Inc."; // UNMASKED_VENDOR_WEBGL
+        if (parameter === 37446) return "Intel Iris OpenGL Engine"; // UNMASKED_RENDERER_WEBGL
+        return getParameter(parameter);
+      };
     });
     try {
       await page.setExtraHTTPHeaders({ "Accept-Language": "pt-BR,pt;q=0.9" });
