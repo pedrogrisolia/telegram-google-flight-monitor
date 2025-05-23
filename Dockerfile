@@ -8,7 +8,7 @@ RUN npm run build
 
 # Stage 2: runtime
 FROM node:20-slim
-RUN apt-get update && apt-get install -y wget gnupg ca-certificates --no-install-recommends && \
+RUN apt-get update && apt-get install -y wget gnupg ca-certificates xvfb --no-install-recommends && \
     wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     dpkg -i /tmp/chrome.deb || apt-get install -fy && \
     rm /tmp/chrome.deb && \
@@ -22,4 +22,4 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable \
     NODE_OPTIONS="--max-old-space-size=512"
 RUN ulimit -n 65535 || true
-CMD ["npm","start"] 
+CMD ["xvfb-run","-a","-s","-screen 0 1280x800x24","npm","start"] 
