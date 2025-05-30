@@ -33,8 +33,8 @@ export class KayakCarService {
       process.env.CHROME_PATH ||
       "/usr/bin/google-chrome-stable";
     const browser = await puppeteer.launch({
-      headless: true,
       executablePath: chromeExecutable,
+      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -49,33 +49,34 @@ export class KayakCarService {
       ],
     });
     const page = await browser.newPage();
-    // set human-like headers
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-    );
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.evaluateOnNewDocument(() => {
-      // evade webdriver detection
-      Object.defineProperty(navigator, "webdriver", { get: () => false });
-      Object.defineProperty(navigator, "languages", {
-        get: () => ["pt-BR", "en-US"],
-      });
-      Object.defineProperty(navigator, "plugins", {
-        get: () => [1, 2, 3, 4, 5],
-      });
-      // fake chrome runtime
-      (window as any).chrome = { runtime: {} };
-      // fake platform
-      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
-      // fake WebGL vendor and renderer
-      const getParameter = WebGLRenderingContext.prototype.getParameter;
-      WebGLRenderingContext.prototype.getParameter = function (parameter) {
-        if (parameter === 37445) return "Intel Inc."; // UNMASKED_VENDOR_WEBGL
-        if (parameter === 37446) return "Intel Iris OpenGL Engine"; // UNMASKED_RENDERER_WEBGL
-        return getParameter(parameter);
-      };
-    });
     try {
+      // set human-like headers
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+      );
+      await page.setViewport({ width: 1280, height: 800 });
+      await page.evaluateOnNewDocument(() => {
+        // evade webdriver detection
+        Object.defineProperty(navigator, "webdriver", { get: () => false });
+        Object.defineProperty(navigator, "languages", {
+          get: () => ["pt-BR", "en-US"],
+        });
+        Object.defineProperty(navigator, "plugins", {
+          get: () => [1, 2, 3, 4, 5],
+        });
+        // fake chrome runtime
+        (window as any).chrome = { runtime: {} };
+        // fake platform
+        Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+        // fake WebGL vendor and renderer
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function (parameter) {
+          if (parameter === 37445) return "Intel Inc."; // UNMASKED_VENDOR_WEBGL
+          if (parameter === 37446) return "Intel Iris OpenGL Engine"; // UNMASKED_RENDERER_WEBGL
+          return getParameter(parameter);
+        };
+      });
+
       await page.setExtraHTTPHeaders({ "Accept-Language": "pt-BR,pt;q=0.9" });
       await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
       await page.waitForSelector(".QYm5", {
@@ -98,18 +99,19 @@ export class KayakCarService {
         console.log(title, priceText, pageUrl, text);
         return { title, price: parseFloat(priceText), url: pageUrl };
       }, url);
-      await page.close();
-      await browser.close();
       if (!result) throw new Error("Nenhum resultado encontrado");
       return result;
     } catch (error) {
       if (onTimeout && error instanceof TimeoutError) {
-        const screenshot = await page.screenshot({ fullPage: true });
-        await onTimeout(screenshot);
+        try {
+          const screenshot = await page.screenshot();
+          await onTimeout(screenshot);
+        } catch {}
       }
-      await page.close();
-      await browser.close();
       throw error;
+    } finally {
+      await page.close().catch(() => {});
+      await browser.close().catch(() => {});
     }
   }
 }
