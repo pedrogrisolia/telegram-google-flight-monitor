@@ -14,6 +14,7 @@ const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL || "30");
 async function connectWithRetry(retries = 5, delay = 5000) {
   for (let i = 0; i < retries; i++) {
     try {
+      console.log("Initializing database connection...");
       await AppDataSource.initialize();
       console.log("Database connection initialized");
       return true;
