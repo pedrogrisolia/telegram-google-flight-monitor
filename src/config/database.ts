@@ -9,6 +9,9 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+// Configuração SSL mais robusta
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
