@@ -189,7 +189,7 @@ export class GoogleFlightsService {
                 '--disable-gpu',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process',
+                //'--single-process',
                 '--disable-extensions',
                 '--lang=pt-BR'
             ],
@@ -288,6 +288,7 @@ export class GoogleFlightsService {
             }));
 
         } catch (error: any) {
+            console.error('Error scraping flight prices:', error);
             lastError = error;
             if(!page.isClosed()) {
                 await page.close();
