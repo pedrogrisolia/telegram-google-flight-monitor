@@ -213,7 +213,7 @@ export class GoogleFlightsService {
                 url += (url.includes('?') ? '&' : '?') + 'curr=BRL';
             }
 
-            await page.goto(url, { waitUntil: 'networkidle0' });
+            await page.goto(url, { waitUntil: "networkidle0" });
 
             const mainContent = await page.waitForSelector('.OgQvJf.nKlB3b', { timeout: 10000 });
             
@@ -251,7 +251,23 @@ export class GoogleFlightsService {
                         airline: row.querySelector('.sSHqwe.tPgKwe span')?.textContent?.trim() || 'N/A',
                         stops: row.querySelector('.EfT7Ae span')?.textContent?.trim() || 'N/A',
                         stopDetails,
-                        price: parseInt(row.querySelector('.YMlIz.FpEdX span')?.getAttribute('aria-label')?.match(/\d+/)?.[0] || '0'),
+                        price: (() => {
+                            const priceSelectors = [
+                                'span[aria-label*="Reais brasileiros"]',
+                                'span[role="text"][aria-label*="Reais"]', 
+                                '.YMlIz.FpEdX span'
+                            ];
+                            
+                            const element = row.querySelector(priceSelectors.join(','));
+                            if (element) {
+                                const ariaLabel = element.getAttribute('aria-label');
+                                const priceMatch = ariaLabel?.match(/\d+/)?.[0];
+                                if (priceMatch) {
+                                    return parseInt(priceMatch);
+                                }
+                            }
+                            return 0;
+                        })(),
                         emissions: row.querySelector('.AdWm1c.lc3qH')?.textContent?.trim() || 'N/A'
                     };
                 });
