@@ -1,17 +1,5 @@
-import puppeteer from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import AnonymizeUAPlugin from "puppeteer-extra-plugin-anonymize-ua";
-import BlockResourcesPlugin from "puppeteer-extra-plugin-block-resources";
 import { TimeoutError } from "puppeteer";
-
-// apply puppeteer-extra plugins
-puppeteer.use(StealthPlugin());
-puppeteer.use(AnonymizeUAPlugin());
-puppeteer.use(
-  BlockResourcesPlugin({
-    blockedTypes: new Set(["image", "media", "font", "stylesheet"]),
-  })
-);
+import { browserManager } from "./BrowserManager";
 
 export interface CarRentalDetails {
   title: string;
@@ -27,27 +15,7 @@ export class KayakCarService {
     onTimeout?: (screenshot: Buffer) => Promise<void>
   ): Promise<CarRentalDetails> {
     const url = `https://www.kayak.com.br/cars/${airportCode}/${startDate}/${endDate}?sort=price_a`;
-    // determine executable path (from Puppeteer env or Docker install)
-    const chromeExecutable =
-      process.env.PUPPETEER_EXECUTABLE_PATH ||
-      process.env.CHROME_PATH ||
-      "/usr/bin/google-chrome-stable";
-    const browser = await puppeteer.launch({
-      executablePath: chromeExecutable,
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-infobars",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--single-process",
-        "--disable-extensions",
-        "--lang=pt-BR",
-      ],
-    });
+    const browser = await browserManager.getBrowser();
     const page = await browser.newPage();
     try {
       // set human-like headers
@@ -111,7 +79,6 @@ export class KayakCarService {
       throw error;
     } finally {
       await page.close().catch(() => {});
-      await browser.close().catch(() => {});
     }
   }
 }

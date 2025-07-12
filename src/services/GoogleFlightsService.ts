@@ -1,4 +1,4 @@
-import puppeteer from "puppeteer";
+import { browserManager } from "./BrowserManager";
 
 export interface StopDetails {
   airport: string;
@@ -190,42 +190,28 @@ export class GoogleFlightsService {
   ): Promise<FlightDetails[]> {
     let lastError: Error | null = null;
 
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        //'--single-process',
-        "--disable-extensions",
-        "--lang=pt-BR",
-      ],
-      ignoreDefaultArgs: ["--disable-extensions"],
-      timeout: 30000,
-    });
-    const page = await browser.newPage();
+    const page = await browserManager.getNewPage();
     try {
-      await page.setExtraHTTPHeaders({
-        "Accept-Language": "pt-BR,pt;q=0.9",
-      });
-
-      await page.setGeolocation({
-        latitude: -23.5505,
-        longitude: -46.6333,
-      });
-
       if (!url.includes("curr=BRL")) {
         url += (url.includes("?") ? "&" : "?") + "curr=BRL";
       }
 
+      if (!url.includes("hl=pt-BR")) {
+        url += (url.includes("?") ? "&" : "?") + "hl=pt-BR";
+      }
+
+      if (!url.includes("gl=BR")) {
+        url += (url.includes("?") ? "&" : "?") + "gl=BR";
+      }
+
       await page.goto(url, { waitUntil: "networkidle0" });
 
-      const mainContent = await page.waitForSelector(".OgQvJf.nKlB3b", {
-        timeout: 10000,
-      });
+      const mainContent = await page.waitForSelector(
+        'div[aria-label*="Horário"]',
+        {
+          timeout: 10000,
+        }
+      );
 
       if (!mainContent) {
         throw new Error(`No flight results found for ${url}`);
@@ -390,7 +376,6 @@ export class GoogleFlightsService {
         throw new Error(`Failed to extract flight details for ${url}`);
       }
       await page.close();
-      await browser.close();
       return flights.map((flight) => ({
         ...flight,
         ...commonInfo,
@@ -401,15 +386,9 @@ export class GoogleFlightsService {
       if (!page.isClosed()) {
         await page.close();
       }
-      if (browser.isConnected()) {
-        await browser.close();
-      }
     } finally {
       if (!page.isClosed()) {
         await page.close();
-      }
-      if (browser.isConnected()) {
-        await browser.close();
       }
     }
 
