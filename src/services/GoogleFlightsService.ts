@@ -1,4 +1,5 @@
 import { browserManager } from "./BrowserManager";
+import fs from "fs";
 
 export interface StopDetails {
   airport: string;
@@ -204,10 +205,10 @@ export class GoogleFlightsService {
         url += (url.includes("?") ? "&" : "?") + "gl=BR";
       }
 
-      await page.goto(url, { waitUntil: "networkidle0" });
+      await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
 
-      const mainContent = await page.waitForSelector(
-        'div[aria-label*="Horário"]',
+      const mainContent = await page.waitForXPath(
+        '//*[text()="Todos os voos" or text()="Principais voos"]',
         {
           timeout: 10000,
         }
@@ -256,7 +257,7 @@ export class GoogleFlightsService {
         // Seletor base para cada voo
         const flightLis: Element[] = [];
         const xpathResult = document.evaluate(
-          "//*[text()='Principais voos']/following-sibling::ul[1]/li",
+          "//*[text()='Todos os voos' or text()='Principais voos']/following-sibling::ul[1]/li",
           document,
           null,
           XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
@@ -381,6 +382,12 @@ export class GoogleFlightsService {
         ...commonInfo,
       }));
     } catch (error: any) {
+      const screenshot = await page.screenshot({
+        path: `error-${Date.now()}.png`,
+      });
+      const html = await page.content();
+      fs.writeFileSync(`error-${Date.now()}.png`, screenshot);
+      fs.writeFileSync(`error-${Date.now()}.html`, html);
       console.error("Error scraping flight prices:", error);
       lastError = error;
       if (!page.isClosed()) {
