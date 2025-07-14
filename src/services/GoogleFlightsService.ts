@@ -272,8 +272,8 @@ export class GoogleFlightsService {
         if (flightLis.length === 0) {
           return null;
         }
-        return flightLis.map((li) => {
-          // Preço
+        const validFlights = [];
+        for (const li of flightLis) {
           let priceText = getTextByXPath(
             li,
             ".//span[contains(@aria-label, 'Reais brasileiros')]"
@@ -293,7 +293,9 @@ export class GoogleFlightsService {
             li,
             ".//span[starts-with(@aria-label, 'Horário de chegada')]/span"
           );
-          // Duração
+          if (!departureTime || !arrivalTime) {
+            continue;
+          }
           const duration = getTextByXPath(
             li,
             ".//div[starts-with(@aria-label, 'Duração total')]"
@@ -332,7 +334,7 @@ export class GoogleFlightsService {
               li,
               ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]/span"
             );
-          return {
+          validFlights.push({
             departureTime: departureTime || "N/A",
             arrivalTime: arrivalTime || "N/A",
             duration: duration || "N/A",
@@ -340,11 +342,12 @@ export class GoogleFlightsService {
             destination: destinationAirport || "N/A",
             airline: airline || "N/A",
             stops: stops || "N/A",
-            stopDetails: [], // Não extraído por XPath robusto aqui
+            stopDetails: [],
             price: price,
             emissions: emissions || "N/A",
-          };
-        });
+          });
+        }
+        return validFlights;
       });
 
       if (!flights) {
