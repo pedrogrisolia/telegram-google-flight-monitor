@@ -779,10 +779,17 @@ export class TelegramService {
             getTranslation("tripUrlMessage", "en", { url: trip.url })
           );
 
-          // Get current lowest price for the trip
-          const oldLowestPrice = Math.min(
-            ...trip.flights.map((f) => f.currentPrice)
+          // Determine the baseline price using the latest saved history when available
+          const lastHistory = await AppDataSource.manager.findOne(
+            PriceHistory,
+            {
+              where: { trip: { id: trip.id } as any },
+              order: { timestamp: "DESC" },
+            }
           );
+          const oldLowestPrice =
+            lastHistory?.price ??
+            Math.min(...trip.flights.map((f) => f.currentPrice));
           console.log(
             getTranslation("currentLowestPriceMessage", "en", {
               oldLowestPrice,
@@ -805,24 +812,34 @@ export class TelegramService {
             getTranslation("newLowestPriceMessage", "en", { newLowestPrice })
           );
 
-          // Update existing flights with new data
-          for (let i = 0; i < trip.flights.length; i++) {
-            if (newFlights[i]) {
-              trip.flights[i].previousPrice = trip.flights[i].currentPrice;
-              trip.flights[i].currentPrice = newFlights[i].price;
-              trip.flights[i].stopDetails = newFlights[i].stopDetails;
-              trip.flights[i].departureTime = newFlights[i].departureTime;
-              trip.flights[i].arrivalTime = newFlights[i].arrivalTime;
-              trip.flights[i].duration = newFlights[i].duration;
-              trip.flights[i].airline = newFlights[i].airline;
-              trip.flights[i].stops = newFlights[i].stops;
-            }
-          }
+          // Replace flights atomically to avoid stale entries causing duplicate alerts
+          await AppDataSource.createQueryBuilder()
+            .delete()
+            .from(Flight)
+            .where("tripId = :tripId", { tripId: trip.id })
+            .execute();
 
-          const savedFligths = await AppDataSource.manager.save(trip.flights);
+          const newFlightEntities: Flight[] = newFlights.map((info) => {
+            const f = new Flight();
+            f.trip = trip;
+            f.origin = info.origin;
+            f.destination = info.destination;
+            f.departureTime = info.departureTime;
+            f.arrivalTime = info.arrivalTime;
+            f.duration = info.duration;
+            f.airline = info.airline;
+            f.stops = info.stops;
+            f.currentPrice = info.price;
+            f.passengers = 1;
+            f.stopDetails = info.stopDetails;
+            return f;
+          });
+          const savedFlights = await AppDataSource.manager.save(
+            newFlightEntities
+          );
           console.log(
             getTranslation("updatedFlightsMessage", "en", {
-              count: savedFligths.length,
+              count: savedFlights.length,
             })
           );
 

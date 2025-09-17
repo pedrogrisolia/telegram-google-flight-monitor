@@ -218,140 +218,163 @@ export class GoogleFlightsService {
         throw new Error(`No flight results found for ${url}`);
       }
 
-      // Refatoração: extração usando XPath robustos
-      const flights = await page.evaluate(() => {
-        function getTextByXPath(node: Node, xpath: string): string {
-          const result = document.evaluate(
-            xpath,
-            node,
+      // Helper to evaluate flights on the page
+      const evaluateFlights = async (): Promise<any[] | null> => {
+        // Refatoração: extração usando XPath robustos
+        return await page.evaluate(() => {
+          function getTextByXPath(node: Node, xpath: string): string {
+            const result = document.evaluate(
+              xpath,
+              node,
+              null,
+              XPathResult.STRING_TYPE,
+              null
+            );
+            return result.stringValue.trim();
+          }
+          // function getNodeByXPath(node: Node, xpath: string): Node | null {
+          //   const result = document.evaluate(
+          //     xpath,
+          //     node,
+          //     null,
+          //     XPathResult.FIRST_ORDERED_NODE_TYPE,
+          //     null
+          //   );
+          //   return result.singleNodeValue;
+          // }
+          // function getAllNodesByXPath(node: Node, xpath: string): Node[] {
+          //   const nodes: Node[] = [];
+          //   const result = document.evaluate(
+          //     xpath,
+          //     node,
+          //     null,
+          //     XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+          //     null
+          //   );
+          //   for (let i = 0; i < result.snapshotLength; i++) {
+          //     nodes.push(result.snapshotItem(i)!);
+          //   }
+          //   return nodes;
+          // }
+          // Seletor base para cada voo
+          const flightLis: Element[] = [];
+          const xpathResult = document.evaluate(
+            "//*[text()='Todos os voos' or text()='Principais voos']/following-sibling::ul[1]/li",
+            document,
             null,
-            XPathResult.STRING_TYPE,
+            XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
             null
           );
-          return result.stringValue.trim();
-        }
-        // function getNodeByXPath(node: Node, xpath: string): Node | null {
-        //   const result = document.evaluate(
-        //     xpath,
-        //     node,
-        //     null,
-        //     XPathResult.FIRST_ORDERED_NODE_TYPE,
-        //     null
-        //   );
-        //   return result.singleNodeValue;
-        // }
-        // function getAllNodesByXPath(node: Node, xpath: string): Node[] {
-        //   const nodes: Node[] = [];
-        //   const result = document.evaluate(
-        //     xpath,
-        //     node,
-        //     null,
-        //     XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-        //     null
-        //   );
-        //   for (let i = 0; i < result.snapshotLength; i++) {
-        //     nodes.push(result.snapshotItem(i)!);
-        //   }
-        //   return nodes;
-        // }
-        // Seletor base para cada voo
-        const flightLis: Element[] = [];
-        const xpathResult = document.evaluate(
-          "//*[text()='Todos os voos' or text()='Principais voos']/following-sibling::ul[1]/li",
-          document,
-          null,
-          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-          null
-        );
-        for (let i = 0; i < xpathResult.snapshotLength && i < 4; i++) {
-          const node = xpathResult.snapshotItem(i);
-          if (node && node.nodeType === Node.ELEMENT_NODE) {
-            flightLis.push(node as Element);
+          for (let i = 0; i < xpathResult.snapshotLength && i < 4; i++) {
+            const node = xpathResult.snapshotItem(i);
+            if (node && node.nodeType === Node.ELEMENT_NODE) {
+              flightLis.push(node as Element);
+            }
           }
-        }
-        if (flightLis.length === 0) {
-          return null;
-        }
-        const validFlights = [];
-        for (const li of flightLis) {
-          let priceText = getTextByXPath(
-            li,
-            ".//span[contains(@aria-label, 'Reais brasileiros')]"
-          );
-          let price = 0;
-          if (priceText) {
-            const priceMatch = priceText.replace(/\D/g, "");
-            if (priceMatch) price = parseInt(priceMatch, 10);
+          if (flightLis.length === 0) {
+            return null;
           }
-          // Horário de partida
-          const departureTime = getTextByXPath(
-            li,
-            ".//span[starts-with(@aria-label, 'Horário de partida')]/span"
-          );
-          // Horário de chegada
-          const arrivalTime = getTextByXPath(
-            li,
-            ".//span[starts-with(@aria-label, 'Horário de chegada')]/span"
-          );
-          if (!departureTime || !arrivalTime) {
-            continue;
-          }
-          const duration = getTextByXPath(
-            li,
-            ".//div[starts-with(@aria-label, 'Duração total')]"
-          );
-          // Aeroportos
-          const originAirport = getTextByXPath(
-            li,
-            "(.//div[starts-with(@aria-label, 'Duração total')]/following-sibling::span//span[@aria-describedby])[1]"
-          );
-          const destinationAirport = getTextByXPath(
-            li,
-            "(.//div[starts-with(@aria-label, 'Duração total')]/following-sibling::span//span[@aria-describedby])[2]"
-          );
-          // Paradas
-          const stops = getTextByXPath(
-            li,
-            ".//span[@aria-label='Voo direto.' or contains(@aria-label, 'parada')]"
-          );
-          // Companhia aérea
-          let airline = getTextByXPath(
-            li,
-            ".//span[contains(@class, 'h1fkLb')]/span[1]"
-          );
-          if (!airline)
-            airline = getTextByXPath(
+          const validFlights = [] as any[];
+          for (const li of flightLis) {
+            let priceText = getTextByXPath(
               li,
-              ".//div[contains(@class, 'sSHqwe') and contains(@class, 'ogfYpf')]/span[1]"
+              ".//span[contains(@aria-label, 'Reais brasileiros')]"
             );
-          // Emissões
-          let emissions = getTextByXPath(
-            li,
-            ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]"
-          );
-          if (!emissions)
-            emissions = getTextByXPath(
+            let price = 0;
+            if (priceText) {
+              const priceMatch = priceText.replace(/\D/g, "");
+              if (priceMatch) price = parseInt(priceMatch, 10);
+            }
+            // Horário de partida
+            const departureTime = getTextByXPath(
               li,
-              ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]/span"
+              ".//span[starts-with(@aria-label, 'Horário de partida')]/span"
             );
-          validFlights.push({
-            departureTime: departureTime || "N/A",
-            arrivalTime: arrivalTime || "N/A",
-            duration: duration || "N/A",
-            origin: originAirport || "N/A",
-            destination: destinationAirport || "N/A",
-            airline: airline || "N/A",
-            stops: stops || "N/A",
-            stopDetails: [],
-            price: price,
-            emissions: emissions || "N/A",
-          });
-        }
-        return validFlights;
-      });
+            // Horário de chegada
+            const arrivalTime = getTextByXPath(
+              li,
+              ".//span[starts-with(@aria-label, 'Horário de chegada')]/span"
+            );
+            if (!departureTime || !arrivalTime) {
+              continue;
+            }
+            const duration = getTextByXPath(
+              li,
+              ".//div[starts-with(@aria-label, 'Duração total')]"
+            );
+            // Aeroportos
+            const originAirport = getTextByXPath(
+              li,
+              "(.//div[starts-with(@aria-label, 'Duração total')]/following-sibling::span//span[@aria-describedby])[1]"
+            );
+            const destinationAirport = getTextByXPath(
+              li,
+              "(.//div[starts-with(@aria-label, 'Duração total')]/following-sibling::span//span[@aria-describedby])[2]"
+            );
+            // Paradas
+            const stops = getTextByXPath(
+              li,
+              ".//span[@aria-label='Voo direto.' or contains(@aria-label, 'parada')]"
+            );
+            // Companhia aérea
+            let airline = getTextByXPath(
+              li,
+              ".//span[contains(@class, 'h1fkLb')]/span[1]"
+            );
+            if (!airline)
+              airline = getTextByXPath(
+                li,
+                ".//div[contains(@class, 'sSHqwe') and contains(@class, 'ogfYpf')]/span[1]"
+              );
+            // Emissões
+            let emissions = getTextByXPath(
+              li,
+              ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]"
+            );
+            if (!emissions)
+              emissions = getTextByXPath(
+                li,
+                ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]/span"
+              );
+            validFlights.push({
+              departureTime: departureTime || "N/A",
+              arrivalTime: arrivalTime || "N/A",
+              duration: duration || "N/A",
+              origin: originAirport || "N/A",
+              destination: destinationAirport || "N/A",
+              airline: airline || "N/A",
+              stops: stops || "N/A",
+              stopDetails: [],
+              price: price,
+              emissions: emissions || "N/A",
+            });
+          }
+          return validFlights;
+        });
+      };
+
+      let flights = await evaluateFlights();
 
       if (!flights) {
         throw new Error(`Failed to extract flight information for ${url}`);
+      }
+
+      // Filter out prices that are clearly not loaded yet
+      flights = flights.filter((f) => (f.price ?? 0) > 0);
+
+      // If prices look suspiciously low (e.g., transient 0/50 while loading), retry once
+      const prices1 = flights.map((f) => f.price).filter((p) => p > 0);
+      const min1 = prices1.length ? Math.min(...prices1) : 0;
+      const max1 = prices1.length ? Math.max(...prices1) : 0;
+      const looksSuspicious =
+        prices1.length >= 2 && (min1 < 80 || (max1 > 0 && min1 < max1 * 0.65));
+      if (looksSuspicious) {
+        console.log("Price looks suspicious, retrying...");
+        await page.waitForTimeout(2000);
+        const second = await evaluateFlights();
+        if (second && second.length) {
+          flights = second.filter((f) => (f.price ?? 0) > 0);
+        }
       }
 
       const commonInfo = await page.evaluate(() => {
