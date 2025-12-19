@@ -202,7 +202,10 @@ export class TelegramService {
     if (!userId) return;
 
     const language = await this.getUserLanguage(userId);
-    await this.bot.sendMessage(chatId, getTranslation("welcomeMessage", language));
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("welcomeMessage", language)
+    );
   }
 
   private async startMonitoring(msg: TelegramBot.Message) {
@@ -211,7 +214,10 @@ export class TelegramService {
     if (!userId) return;
 
     const language = await this.getUserLanguage(userId);
-    await this.bot.sendMessage(chatId, getTranslation("setupMessage", language));
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("setupMessage", language)
+    );
     this.userStates.set(userId, { step: "AWAITING_URL" });
   }
 
@@ -228,7 +234,11 @@ export class TelegramService {
       },
     ]);
     keyboard.push([{ text: "Ver mais", callback_data: "car_airport_more" }]);
-    await this.bot.sendMessage(chatId, getTranslation("selectCarAirport", language), { reply_markup: { inline_keyboard: keyboard } });
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("selectCarAirport", language),
+      { reply_markup: { inline_keyboard: keyboard } }
+    );
     this.userStates.set(userId, { step: "AWAITING_CAR_AIRPORT" });
   }
 
@@ -243,13 +253,24 @@ export class TelegramService {
     if (!state) return;
 
     if (state.step === "AWAITING_URL") {
-      if (!msg.link_preview_options?.url || !msg.link_preview_options?.url.includes("https://www.google.com/travel/flights/search?tfs=")) {
-        await this.bot.sendMessage(chatId, getTranslation("invalidUrlMessage", language));
+      if (
+        !msg.link_preview_options?.url ||
+        !msg.link_preview_options?.url.includes(
+          "https://www.google.com/travel/flights/search?tfs="
+        )
+      ) {
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("invalidUrlMessage", language)
+        );
         return;
       }
 
       const url = msg.link_preview_options.url;
-      this.bot.sendMessage(chatId, getTranslation("processingUrlMessage", language, { url }));
+      this.bot.sendMessage(
+        chatId,
+        getTranslation("processingUrlMessage", language, { url })
+      );
       // Extract date from URL first
       try {
         const flights = await GoogleFlightsService.getFlightPricesFromUrl(url);
@@ -262,13 +283,23 @@ export class TelegramService {
           state.step = "AWAITING_DATE_RANGE";
 
           // Offer date range options
-          await this.offerDateRangeOptions(chatId, state.date, language, state.origin!, state.destination!, state.price!);
+          await this.offerDateRangeOptions(
+            chatId,
+            state.date,
+            language,
+            state.origin!,
+            state.destination!,
+            state.price!
+          );
         } else {
           throw new Error("No flights found");
         }
       } catch (error) {
         console.error("Error getting flight info:", error);
-        await this.bot.sendMessage(chatId, getTranslation("urlErrorMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("urlErrorMessage", language)
+        );
         this.userStates.delete(userId);
       }
     }
@@ -277,7 +308,10 @@ export class TelegramService {
       state.startDate = msg.text!;
       state.step = "AWAITING_CAR_END_DATE";
       this.userStates.set(userId, state);
-      await this.bot.sendMessage(chatId, getTranslation("askCarEndDate", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("askCarEndDate", language)
+      );
       return;
     }
     if (state.step === "AWAITING_CAR_END_DATE") {
@@ -325,14 +359,24 @@ export class TelegramService {
         );
       } catch (error) {
         console.error("Error setting up car monitor:", error);
-        await this.bot.sendMessage(chatId, getTranslation("carMonitorSetupError", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("carMonitorSetupError", language)
+        );
       }
       this.userStates.delete(userId);
       return;
     }
   }
 
-  private async offerDateRangeOptions(chatId: number, date: string, language: string, origin: string, destination: string, price: number) {
+  private async offerDateRangeOptions(
+    chatId: number,
+    date: string,
+    language: string,
+    origin: string,
+    destination: string,
+    price: number
+  ) {
     const keyboard = [
       [
         {
@@ -434,12 +478,16 @@ export class TelegramService {
       await AppDataSource.manager.save(user);
 
       // Send confirmation message
-      await this.bot.sendMessage(chatId, getTranslation("languageChangedMessage", newLanguage));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("languageChangedMessage", newLanguage)
+      );
       return;
     }
 
     if (query.data.startsWith("car_airport_")) {
-      const code = query.data === "car_airport_more" ? null : query.data.split("_")[2];
+      const code =
+        query.data === "car_airport_more" ? null : query.data.split("_")[2];
       if (query.data === "car_airport_more") {
         const rest = TelegramService.BRAZIL_AIRPORTS.slice(10);
         const kb = rest.map((a) => [
@@ -448,14 +496,21 @@ export class TelegramService {
             callback_data: `car_airport_${a.code}`,
           },
         ]);
-        await this.bot.sendMessage(chatId, getTranslation("selectCarAirportMore", language), { reply_markup: { inline_keyboard: kb } });
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("selectCarAirportMore", language),
+          { reply_markup: { inline_keyboard: kb } }
+        );
       } else if (code) {
         const state = this.userStates.get(userId);
         if (!state) return;
         state.step = "AWAITING_CAR_START_DATE";
         state.airportCode = code;
         this.userStates.set(userId, state);
-        await this.bot.sendMessage(chatId, getTranslation("askCarStartDate", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("askCarStartDate", language)
+        );
       }
       return;
     }
@@ -469,10 +524,23 @@ export class TelegramService {
       await this.stopCarMonitoring(chatId, userId, rentalId, language);
     } else if (query.data.startsWith("range_")) {
       const state = this.userStates.get(userId);
-      if (!state || !state.url || !state.date || state.step !== "AWAITING_DATE_RANGE") return;
+      if (
+        !state ||
+        !state.url ||
+        !state.date ||
+        state.step !== "AWAITING_DATE_RANGE"
+      )
+        return;
 
       const range = parseInt(query.data.split("_")[1]);
-      await this.setupFlightMonitoringWithRange(chatId, userId, state.url, state.date, range, language);
+      await this.setupFlightMonitoringWithRange(
+        chatId,
+        userId,
+        state.url,
+        state.date,
+        range,
+        language
+      );
       this.userStates.delete(userId);
     }
   }
@@ -502,11 +570,15 @@ export class TelegramService {
       ],
     ];
 
-    await this.bot.sendMessage(chatId, getTranslation("languageSelectionMessage", currentLanguage), {
-      reply_markup: {
-        inline_keyboard: keyboard,
-      },
-    });
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("languageSelectionMessage", currentLanguage),
+      {
+        reply_markup: {
+          inline_keyboard: keyboard,
+        },
+      }
+    );
   }
 
   private parseBrazilianDate(dateStr: string): Date {
@@ -556,40 +628,19 @@ export class TelegramService {
     return `${year}-${month}-${day}`;
   }
 
-  private async removePastDateTrips(trips: Trip[]): Promise<Trip[]> {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const tripsToDelete: Trip[] = [];
-    const validTrips: Trip[] = [];
-
-    for (const trip of trips) {
-      try {
-        const tripDate = this.parseBrazilianDate(trip.date);
-        tripDate.setHours(0, 0, 0, 0);
-        if (tripDate < now) {
-          tripsToDelete.push(trip);
-        } else {
-          validTrips.push(trip);
-        }
-      } catch (error) {
-        console.error(`Error parsing date for trip ${trip.id}:`, error);
-        validTrips.push(trip);
-      }
-    }
-
-    if (tripsToDelete.length > 0) {
-      for (const trip of tripsToDelete) {
-        await AppDataSource.manager.remove(trip);
-        console.log(`Deleted trip ${trip.id} with past date: ${trip.date}`);
-      }
-    }
-
-    return validTrips;
-  }
-
-  private async setupFlightMonitoringWithRange(chatId: number, userId: number, url: string, date: string, range: number, language: string) {
+  private async setupFlightMonitoringWithRange(
+    chatId: number,
+    userId: number,
+    url: string,
+    date: string,
+    range: number,
+    language: string
+  ) {
     try {
-      await this.bot.sendMessage(chatId, getTranslation("settingUpMonitoringMessage", language, { range }));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("settingUpMonitoringMessage", language, { range })
+      );
 
       // Create or find user
       let user = await AppDataSource.manager.findOne(User, {
@@ -631,8 +682,14 @@ export class TelegramService {
       let successCount = 0;
       for (const targetDate of dates) {
         try {
-          const dateUrl = GoogleFlightsService.changeDateInUrl(url, baseDateStr, targetDate);
-          const flights = await GoogleFlightsService.getFlightPricesFromUrl(dateUrl);
+          const dateUrl = GoogleFlightsService.changeDateInUrl(
+            url,
+            baseDateStr,
+            targetDate
+          );
+          const flights = await GoogleFlightsService.getFlightPricesFromUrl(
+            dateUrl
+          );
 
           if (flights.length > 0) {
             // Create trip entity
@@ -674,13 +731,22 @@ export class TelegramService {
       }
 
       if (successCount > 0) {
-        await this.bot.sendMessage(chatId, getTranslation("successMessage", language, { count: successCount }));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("successMessage", language, { count: successCount })
+        );
       } else {
-        await this.bot.sendMessage(chatId, getTranslation("noSuccessMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noSuccessMessage", language)
+        );
       }
     } catch (error) {
       console.error("Error setting up flight monitoring:", error);
-      await this.bot.sendMessage(chatId, getTranslation("setupErrorMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("setupErrorMessage", language)
+      );
     }
   }
 
@@ -699,10 +765,7 @@ export class TelegramService {
         })
       );
 
-      // Remove trips with past dates
-      const validTrips = await this.removePastDateTrips(activeTrips);
-
-      for (const trip of validTrips) {
+      for (const trip of activeTrips) {
         try {
           console.log(
             getTranslation("checkingTripMessage", "en", {
@@ -712,14 +775,21 @@ export class TelegramService {
               date: trip.date,
             })
           );
-          console.log(getTranslation("tripUrlMessage", "en", { url: trip.url }));
+          console.log(
+            getTranslation("tripUrlMessage", "en", { url: trip.url })
+          );
 
           // Determine the baseline price using the latest saved history when available
-          const lastHistory = await AppDataSource.manager.findOne(PriceHistory, {
-            where: { trip: { id: trip.id } as any },
-            order: { timestamp: "DESC" },
-          });
-          const oldLowestPrice = lastHistory?.price ?? Math.min(...trip.flights.map((f) => f.currentPrice));
+          const lastHistory = await AppDataSource.manager.findOne(
+            PriceHistory,
+            {
+              where: { trip: { id: trip.id } as any },
+              order: { timestamp: "DESC" },
+            }
+          );
+          const oldLowestPrice =
+            lastHistory?.price ??
+            Math.min(...trip.flights.map((f) => f.currentPrice));
           console.log(
             getTranslation("currentLowestPriceMessage", "en", {
               oldLowestPrice,
@@ -728,7 +798,9 @@ export class TelegramService {
 
           // Fetch new prices
           console.log(getTranslation("fetchingNewPricesMessage", "en"));
-          const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url);
+          const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(
+            trip.url
+          );
           console.log(
             getTranslation("foundNewFlightsMessage", "en", {
               count: newFlights.length,
@@ -736,10 +808,16 @@ export class TelegramService {
           );
 
           const newLowestPrice = Math.min(...newFlights.map((f) => f.price));
-          console.log(getTranslation("newLowestPriceMessage", "en", { newLowestPrice }));
+          console.log(
+            getTranslation("newLowestPriceMessage", "en", { newLowestPrice })
+          );
 
           // Replace flights atomically to avoid stale entries causing duplicate alerts
-          await AppDataSource.createQueryBuilder().delete().from(Flight).where("tripId = :tripId", { tripId: trip.id }).execute();
+          await AppDataSource.createQueryBuilder()
+            .delete()
+            .from(Flight)
+            .where("tripId = :tripId", { tripId: trip.id })
+            .execute();
 
           const newFlightEntities: Flight[] = newFlights.map((info) => {
             const f = new Flight();
@@ -756,7 +834,9 @@ export class TelegramService {
             f.stopDetails = info.stopDetails;
             return f;
           });
-          const savedFlights = await AppDataSource.manager.save(newFlightEntities);
+          const savedFlights = await AppDataSource.manager.save(
+            newFlightEntities
+          );
           console.log(
             getTranslation("updatedFlightsMessage", "en", {
               count: savedFlights.length,
@@ -769,12 +849,17 @@ export class TelegramService {
             priceHistory.price = newLowestPrice;
             priceHistory.trip = trip;
             await AppDataSource.manager.save(priceHistory);
-            console.log(`Saved new price point R$ ${newLowestPrice} to history`);
+            console.log(
+              `Saved new price point R$ ${newLowestPrice} to history`
+            );
           }
 
           // Calculate price change percentage
           const priceChange = newLowestPrice - oldLowestPrice;
-          const percentageChange = ((priceChange / oldLowestPrice) * 100).toFixed(1);
+          const percentageChange = (
+            (priceChange / oldLowestPrice) *
+            100
+          ).toFixed(1);
           const absolutePercentageChange = Math.abs(Number(percentageChange));
 
           // Notify if lowest price changed by 5% or more
@@ -786,7 +871,8 @@ export class TelegramService {
               })
             );
             const emoji = priceChange > 0 ? "🔴" : "🟢";
-            const trendKey = priceChange > 0 ? "priceIncreased" : "priceDecreased";
+            const trendKey =
+              priceChange > 0 ? "priceIncreased" : "priceDecreased";
             const language =
               (
                 await AppDataSource.manager.findOne(User, {
@@ -803,14 +889,22 @@ export class TelegramService {
 
             let priceExtremesMessage = "";
             if (tripWithHistory?.priceHistory.length) {
-              const historicalPrices = tripWithHistory.priceHistory.map((h) => h.price);
+              const historicalPrices = tripWithHistory.priceHistory.map(
+                (h) => h.price
+              );
               const historicalLowest = Math.min(...historicalPrices);
               const historicalHighest = Math.max(...historicalPrices);
 
               if (newLowestPrice <= historicalLowest) {
-                priceExtremesMessage = getTranslation("newLowestHistoricalPrice", language);
+                priceExtremesMessage = getTranslation(
+                  "newLowestHistoricalPrice",
+                  language
+                );
               } else if (newLowestPrice >= historicalHighest) {
-                priceExtremesMessage = getTranslation("newHighestHistoricalPrice", language);
+                priceExtremesMessage = getTranslation(
+                  "newHighestHistoricalPrice",
+                  language
+                );
               }
             }
 
@@ -825,12 +919,16 @@ export class TelegramService {
               oldPrice: oldLowestPrice,
               newPrice: newLowestPrice,
               url: trip.url,
-              priceExtremesMessage: priceExtremesMessage ? `\n${priceExtremesMessage}` : "",
+              priceExtremesMessage: priceExtremesMessage
+                ? `\n${priceExtremesMessage}`
+                : "",
             });
 
             // Generate price history chart
             if (tripWithHistory && tripWithHistory?.priceHistory?.length > 1) {
-              const chartBuffer = await ChartService.generatePriceHistoryChart(tripWithHistory.priceHistory);
+              const chartBuffer = await ChartService.generatePriceHistoryChart(
+                tripWithHistory.priceHistory
+              );
 
               // Send chart image with alert message
               await this.bot.sendPhoto(trip.userId, chartBuffer, {
@@ -861,7 +959,9 @@ export class TelegramService {
             }),
             error
           );
-          if (error?.message?.includes("Failed to launch the browser process!")) {
+          if (
+            error?.message?.includes("Failed to launch the browser process!")
+          ) {
             console.log("Critical Puppeteer error detected, restarting app...");
             process.exit(1);
           }
@@ -877,11 +977,18 @@ export class TelegramService {
       console.log(`Found ${activeRentals.length} active car rentals to check`);
       for (const rental of activeRentals) {
         try {
-          console.log(`Checking car rental ID ${rental.id}: ${rental.airportCode} ${rental.startDate}→${rental.endDate}`);
+          console.log(
+            `Checking car rental ID ${rental.id}: ${rental.airportCode} ${rental.startDate}→${rental.endDate}`
+          );
           const oldPrice = rental.lastPrice;
-          const details = await KayakCarService.getMinCarPrice(rental.airportCode, rental.startDate, rental.endDate, async (screenshot) => {
-            await this.bot.sendPhoto(rental.userId, screenshot);
-          });
+          const details = await KayakCarService.getMinCarPrice(
+            rental.airportCode,
+            rental.startDate,
+            rental.endDate,
+            async (screenshot) => {
+              await this.bot.sendPhoto(rental.userId, screenshot);
+            }
+          );
           console.log(`Found price: ${details.price}`);
           const newPrice = details.price;
           if (newPrice !== oldPrice) {
@@ -892,7 +999,9 @@ export class TelegramService {
             rental.lastPrice = newPrice;
             await AppDataSource.manager.save(rental);
             const priceChange = newPrice - oldPrice;
-            const percentageChange = ((priceChange / oldPrice) * 100).toFixed(1);
+            const percentageChange = ((priceChange / oldPrice) * 100).toFixed(
+              1
+            );
             const absPerc = Math.abs(Number(percentageChange));
             if (absPerc >= 5) {
               const userLang =
@@ -902,15 +1011,29 @@ export class TelegramService {
                   })
                 )?.language || "en";
               const emoji = priceChange > 0 ? "🔴" : "🟢";
-              const trend = getTranslation(priceChange > 0 ? "priceIncreased" : "priceDecreased", userLang);
-              const rentalWithHist = await AppDataSource.manager.findOne(CarRental, { where: { id: rental.id }, relations: ["priceHistory"] });
+              const trend = getTranslation(
+                priceChange > 0 ? "priceIncreased" : "priceDecreased",
+                userLang
+              );
+              const rentalWithHist = await AppDataSource.manager.findOne(
+                CarRental,
+                { where: { id: rental.id }, relations: ["priceHistory"] }
+              );
               let extremesMsg = "";
               if (rentalWithHist?.priceHistory.length) {
                 const prices = rentalWithHist.priceHistory.map((h) => h.price);
                 const lowest = Math.min(...prices);
                 const highest = Math.max(...prices);
-                if (newPrice <= lowest) extremesMsg = getTranslation("newLowestHistoricalPrice", userLang);
-                else if (newPrice >= highest) extremesMsg = getTranslation("newHighestHistoricalPrice", userLang);
+                if (newPrice <= lowest)
+                  extremesMsg = getTranslation(
+                    "newLowestHistoricalPrice",
+                    userLang
+                  );
+                else if (newPrice >= highest)
+                  extremesMsg = getTranslation(
+                    "newHighestHistoricalPrice",
+                    userLang
+                  );
               }
               const msgText = getTranslation("carPriceAlert", userLang, {
                 emoji,
@@ -937,7 +1060,10 @@ export class TelegramService {
       }
       console.log("\nPrice check completed");
     } catch (error: Error | any) {
-      console.error(getTranslation("errorInCheckPriceUpdatesMessage", "en"), error);
+      console.error(
+        getTranslation("errorInCheckPriceUpdatesMessage", "en"),
+        error
+      );
       if (error?.message?.includes("Failed to launch the browser process!")) {
         console.log("Critical Puppeteer error detected, restarting app...");
         process.exit(1);
@@ -952,13 +1078,10 @@ export class TelegramService {
 
     const language = await this.getUserLanguage(userId);
     try {
-      let trips = await AppDataSource.manager.find(Trip, {
+      const trips = await AppDataSource.manager.find(Trip, {
         where: { userId, isActive: true },
         relations: ["flights"],
       });
-
-      // Remove trips with past dates
-      trips = await this.removePastDateTrips(trips);
 
       trips.sort((a, b) => {
         const priceA = Math.min(...a.flights.map((f) => f.currentPrice));
@@ -972,12 +1095,18 @@ export class TelegramService {
       });
 
       if (trips.length === 0) {
-        await this.bot.sendMessage(chatId, getTranslation("noActiveMonitorsMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noActiveMonitorsMessage", language)
+        );
         return;
       }
 
       // Send initial message
-      await this.bot.sendMessage(chatId, getTranslation("listTripsMessage", language, { count: trips.length }));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("listTripsMessage", language, { count: trips.length })
+      );
 
       // Split trips into groups of 10
       const TRIPS_PER_MESSAGE = 10;
@@ -985,7 +1114,9 @@ export class TelegramService {
         const tripGroup = trips.slice(i, i + TRIPS_PER_MESSAGE);
         const message = tripGroup
           .map((trip, index) => {
-            const lowestPrice = Math.min(...trip.flights.map((f) => f.currentPrice));
+            const lowestPrice = Math.min(
+              ...trip.flights.map((f) => f.currentPrice)
+            );
             return getTranslation("tripListItem", language, {
               index: i + index + 1,
               origin: trip.flights[0].origin,
@@ -1004,7 +1135,10 @@ export class TelegramService {
       }
     } catch (error) {
       console.error("Error listing trips:", error);
-      await this.bot.sendMessage(chatId, getTranslation("listErrorMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("listErrorMessage", language)
+      );
     }
   }
 
@@ -1015,13 +1149,10 @@ export class TelegramService {
 
     const language = await this.getUserLanguage(userId);
     try {
-      let trips = await AppDataSource.manager.find(Trip, {
+      const trips = await AppDataSource.manager.find(Trip, {
         where: { userId, isActive: true },
         relations: ["flights"],
       });
-
-      // Remove trips with past dates
-      trips = await this.removePastDateTrips(trips);
 
       trips.sort((a, b) => {
         const dateA = this.parseBrazilianDate(a.date);
@@ -1030,29 +1161,46 @@ export class TelegramService {
       });
 
       if (trips.length === 0) {
-        await this.bot.sendMessage(chatId, getTranslation("noActiveMonitorsToStopMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noActiveMonitorsToStopMessage", language)
+        );
         return;
       }
 
       const keyboard = trips.map((trip, index) => [
         {
-          text: `${index + 1}. ${trip.flights[0].origin} → ${trip.flights[0].destination} (${trip.date})`,
+          text: `${index + 1}. ${trip.flights[0].origin} → ${
+            trip.flights[0].destination
+          } (${trip.date})`,
           callback_data: `stop_${trip.id}`,
         },
       ]);
 
-      await this.bot.sendMessage(chatId, getTranslation("stopMonitorPrompt", language), {
-        reply_markup: {
-          inline_keyboard: keyboard,
-        },
-      });
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("stopMonitorPrompt", language),
+        {
+          reply_markup: {
+            inline_keyboard: keyboard,
+          },
+        }
+      );
     } catch (error) {
       console.error("Error listing trips for stop command:", error);
-      await this.bot.sendMessage(chatId, getTranslation("listErrorMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("listErrorMessage", language)
+      );
     }
   }
 
-  private async stopMonitoring(chatId: number, userId: number, tripId: number, language: string) {
+  private async stopMonitoring(
+    chatId: number,
+    userId: number,
+    tripId: number,
+    language: string
+  ) {
     try {
       const trip = await AppDataSource.manager.findOne(Trip, {
         where: { id: tripId, userId },
@@ -1060,7 +1208,10 @@ export class TelegramService {
       });
 
       if (!trip) {
-        await this.bot.sendMessage(chatId, getTranslation("noMonitorFoundMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noMonitorFoundMessage", language)
+        );
         return;
       }
 
@@ -1077,17 +1228,28 @@ export class TelegramService {
       );
     } catch (error) {
       console.error("Error stopping flight monitor:", error);
-      await this.bot.sendMessage(chatId, getTranslation("stopErrorMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("stopErrorMessage", language)
+      );
     }
   }
 
-  private async stopCarMonitoring(chatId: number, userId: number, rentalId: number, language: string) {
+  private async stopCarMonitoring(
+    chatId: number,
+    userId: number,
+    rentalId: number,
+    language: string
+  ) {
     try {
       const rental = await AppDataSource.manager.findOne(CarRental, {
         where: { id: rentalId, userId },
       });
       if (!rental) {
-        await this.bot.sendMessage(chatId, getTranslation("noActiveCarMonitorsMessage", language));
+        await this.bot.sendMessage(
+          chatId,
+          getTranslation("noActiveCarMonitorsMessage", language)
+        );
         return;
       }
       rental.isActive = false;
@@ -1102,7 +1264,10 @@ export class TelegramService {
       );
     } catch (error) {
       console.error("Error stopping car rental monitor:", error);
-      await this.bot.sendMessage(chatId, getTranslation("stopCarErrorMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("stopCarErrorMessage", language)
+      );
     }
   }
 
@@ -1115,13 +1280,24 @@ export class TelegramService {
       where: { userId, isActive: true },
     });
     if (rentals.length === 0) {
-      await this.bot.sendMessage(chatId, getTranslation("noActiveCarMonitorsMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("noActiveCarMonitorsMessage", language)
+      );
       return;
     }
     // Send header message
-    await this.bot.sendMessage(chatId, getTranslation("listCarsMessage", language, { count: rentals.length }));
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("listCarsMessage", language, { count: rentals.length })
+    );
     // Send plain list of car rentals
-    const lines = rentals.map((r, i) => `${i + 1}. ${r.airportCode} ${r.startDate}→${r.endDate} – R$ ${r.lastPrice}`);
+    const lines = rentals.map(
+      (r, i) =>
+        `${i + 1}. ${r.airportCode} ${r.startDate}→${r.endDate} – R$ ${
+          r.lastPrice
+        }`
+    );
     await this.bot.sendMessage(chatId, lines.join("\n"), {
       disable_web_page_preview: true,
     });
@@ -1136,7 +1312,10 @@ export class TelegramService {
       where: { userId, isActive: true },
     });
     if (rentals.length === 0) {
-      await this.bot.sendMessage(chatId, getTranslation("noActiveCarMonitorsMessage", language));
+      await this.bot.sendMessage(
+        chatId,
+        getTranslation("noActiveCarMonitorsMessage", language)
+      );
       return;
     }
     const keyboard = rentals.map((r, i) => [
@@ -1145,7 +1324,11 @@ export class TelegramService {
         callback_data: `stop_car_${r.id}`,
       },
     ]);
-    await this.bot.sendMessage(chatId, getTranslation("stopCarMonitorPrompt", language), { reply_markup: { inline_keyboard: keyboard } });
+    await this.bot.sendMessage(
+      chatId,
+      getTranslation("stopCarMonitorPrompt", language),
+      { reply_markup: { inline_keyboard: keyboard } }
+    );
   }
 
   public handleWebhookUpdate(update: any) {
