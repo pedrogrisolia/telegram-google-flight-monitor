@@ -1,5 +1,7 @@
 import { browserManager } from "./BrowserManager";
 import fs from "fs";
+import { AppDataSource } from "../config/database";
+import { Trip } from "../entities/Trip";
 
 export interface StopDetails {
   airport: string;
@@ -26,11 +28,7 @@ export class GoogleFlightsService {
   private static validateGoogleFlightsUrl(url: string): boolean {
     try {
       const parsedUrl = new URL(url);
-      return (
-        parsedUrl.hostname === "www.google.com" &&
-        parsedUrl.pathname.includes("/travel/flights") &&
-        parsedUrl.searchParams.has("tfs")
-      );
+      return parsedUrl.hostname === "www.google.com" && parsedUrl.pathname.includes("/travel/flights") && parsedUrl.searchParams.has("tfs");
     } catch {
       return false;
     }
@@ -41,10 +39,7 @@ export class GoogleFlightsService {
     const tfsMatch = url.match(/tfs=([^&]*)/);
     if (tfsMatch) {
       const tfsValue = tfsMatch[1];
-      const cleanTfsValue = tfsValue.replace(
-        /_+/g,
-        "_".repeat(underscoreCount)
-      );
+      const cleanTfsValue = tfsValue.replace(/_+/g, "_".repeat(underscoreCount));
       url = url.replace(tfsMatch[1], cleanTfsValue);
     }
 
@@ -57,11 +52,7 @@ export class GoogleFlightsService {
     return (tfsMatch[1].match(/_/g) || []).length;
   }
 
-  static changeDateInUrl(
-    url: string,
-    oldDate: string,
-    newDate: string
-  ): string {
+  static changeDateInUrl(url: string, oldDate: string, newDate: string): string {
     // Extract the tfs parameter
     const tfsMatch = url.match(/tfs=([^&]*)/);
     if (!tfsMatch) return url;
@@ -94,7 +85,7 @@ export class GoogleFlightsService {
     return url;
   }
 
-  static async getFlightPricesFromUrl(url: string): Promise<FlightDetails[]> {
+  static async getFlightPricesFromUrl(url: string, tripId?: number): Promise<FlightDetails[]> {
     const underscoreCount = this.countUnderscores(url);
     console.log(`URL has ${underscoreCount} underscores`);
 
@@ -105,7 +96,7 @@ export class GoogleFlightsService {
         if (!this.validateGoogleFlightsUrl(urlWith11)) {
           throw new Error("Invalid Google Flights URL");
         }
-        const results = await this.scrapeFlightPrices(urlWith11);
+        const results = await this.scrapeFlightPrices(urlWith11, tripId);
         return results.map((result) => ({
           ...result,
           successfulUrl: urlWith11,
@@ -118,7 +109,7 @@ export class GoogleFlightsService {
           if (!this.validateGoogleFlightsUrl(urlWith12)) {
             throw new Error("Invalid Google Flights URL");
           }
-          const results = await this.scrapeFlightPrices(urlWith12);
+          const results = await this.scrapeFlightPrices(urlWith12, tripId);
           return results.map((result) => ({
             ...result,
             successfulUrl: urlWith12,
@@ -135,7 +126,7 @@ export class GoogleFlightsService {
         if (!this.validateGoogleFlightsUrl(url)) {
           throw new Error("Invalid Google Flights URL");
         }
-        const results = await this.scrapeFlightPrices(url);
+        const results = await this.scrapeFlightPrices(url, tripId);
         return results.map((result) => ({
           ...result,
           successfulUrl: url,
@@ -147,7 +138,7 @@ export class GoogleFlightsService {
           if (!this.validateGoogleFlightsUrl(urlWith12)) {
             throw new Error("Invalid Google Flights URL");
           }
-          const results = await this.scrapeFlightPrices(urlWith12);
+          const results = await this.scrapeFlightPrices(urlWith12, tripId);
           return results.map((result) => ({
             ...result,
             successfulUrl: urlWith12,
@@ -163,7 +154,7 @@ export class GoogleFlightsService {
       if (!this.validateGoogleFlightsUrl(url)) {
         throw new Error("Invalid Google Flights URL");
       }
-      const results = await this.scrapeFlightPrices(url);
+      const results = await this.scrapeFlightPrices(url, tripId);
       return results.map((result) => ({
         ...result,
         successfulUrl: url,
@@ -175,7 +166,7 @@ export class GoogleFlightsService {
         if (!this.validateGoogleFlightsUrl(urlWith11)) {
           throw new Error("Invalid Google Flights URL");
         }
-        const results = await this.scrapeFlightPrices(urlWith11);
+        const results = await this.scrapeFlightPrices(urlWith11, tripId);
         return results.map((result) => ({
           ...result,
           successfulUrl: urlWith11,
@@ -186,9 +177,7 @@ export class GoogleFlightsService {
     }
   }
 
-  private static async scrapeFlightPrices(
-    url: string
-  ): Promise<FlightDetails[]> {
+  private static async scrapeFlightPrices(url: string, tripId?: number): Promise<FlightDetails[]> {
     let lastError: Error | null = null;
 
     const page = await browserManager.getNewPage();
@@ -207,14 +196,48 @@ export class GoogleFlightsService {
 
       await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
 
-      const mainContent = await page.waitForXPath(
-        '//*[text()="Todos os voos" or text()="Principais voos"]',
-        {
+      // Buscar em paralelo pelo conteúdo principal e pela mensagem de erro
+      const mainContentPromise = page
+        .waitForXPath('//*[text()="Todos os voos" or text()="Principais voos"]', {
           timeout: 10000,
-        }
-      );
+        })
+        .then(() => ({ type: "success" as const }))
+        .catch(() => ({ type: "timeout" as const }));
 
-      if (!mainContent) {
+      const errorMessagePromise = page
+        .waitForXPath('.//*[text()="A data de voo solicitada é anterior à data atual."]', {
+          timeout: 10000,
+        })
+        .then(() => ({ type: "error" as const }))
+        .catch(() => ({ type: "timeout" as const }));
+
+      const result = await Promise.race([mainContentPromise, errorMessagePromise]);
+
+      // Verificar se a mensagem de erro está presente (mesmo que o conteúdo principal tenha aparecido primeiro)
+      const errorElement = await page.$x('.//*[text()="A data de voo solicitada é anterior à data atual."]');
+
+      if (errorElement.length > 0) {
+        if (tripId) {
+          try {
+            await AppDataSource.manager.delete(Trip, tripId);
+            console.log(`Trip ${tripId} deleted due to past date error`);
+          } catch (deleteError) {
+            console.error(`Error deleting trip ${tripId}:`, deleteError);
+          }
+        }
+        await page.close();
+        return [];
+      }
+
+      // Se encontrou a mensagem de erro primeiro, já retornou acima
+      // Se não encontrou o conteúdo principal, lançar exceção
+      if (result.type === "timeout") {
+        throw new Error(`No flight results found for ${url}`);
+      }
+
+      const mainContent = await page.$x('//*[text()="Todos os voos" or text()="Principais voos"]');
+
+      if (mainContent.length === 0) {
         throw new Error(`No flight results found for ${url}`);
       }
 
@@ -223,13 +246,7 @@ export class GoogleFlightsService {
         // Refatoração: extração usando XPath robustos
         return await page.evaluate(() => {
           function getTextByXPath(node: Node, xpath: string): string {
-            const result = document.evaluate(
-              xpath,
-              node,
-              null,
-              XPathResult.STRING_TYPE,
-              null
-            );
+            const result = document.evaluate(xpath, node, null, XPathResult.STRING_TYPE, null);
             return result.stringValue.trim();
           }
           // function getNodeByXPath(node: Node, xpath: string): Node | null {
@@ -276,32 +293,20 @@ export class GoogleFlightsService {
           }
           const validFlights = [] as any[];
           for (const li of flightLis) {
-            let priceText = getTextByXPath(
-              li,
-              ".//span[contains(@aria-label, 'Reais brasileiros')]"
-            );
+            let priceText = getTextByXPath(li, ".//span[contains(@aria-label, 'Reais brasileiros')]");
             let price = 0;
             if (priceText) {
               const priceMatch = priceText.replace(/\D/g, "");
               if (priceMatch) price = parseInt(priceMatch, 10);
             }
             // Horário de partida
-            const departureTime = getTextByXPath(
-              li,
-              ".//span[starts-with(@aria-label, 'Horário de partida')]/span"
-            );
+            const departureTime = getTextByXPath(li, ".//span[starts-with(@aria-label, 'Horário de partida')]/span");
             // Horário de chegada
-            const arrivalTime = getTextByXPath(
-              li,
-              ".//span[starts-with(@aria-label, 'Horário de chegada')]/span"
-            );
+            const arrivalTime = getTextByXPath(li, ".//span[starts-with(@aria-label, 'Horário de chegada')]/span");
             if (!departureTime || !arrivalTime) {
               continue;
             }
-            const duration = getTextByXPath(
-              li,
-              ".//div[starts-with(@aria-label, 'Duração total')]"
-            );
+            const duration = getTextByXPath(li, ".//div[starts-with(@aria-label, 'Duração total')]");
             // Aeroportos
             const originAirport = getTextByXPath(
               li,
@@ -312,30 +317,13 @@ export class GoogleFlightsService {
               "(.//div[starts-with(@aria-label, 'Duração total')]/following-sibling::span//span[@aria-describedby])[2]"
             );
             // Paradas
-            const stops = getTextByXPath(
-              li,
-              ".//span[@aria-label='Voo direto.' or contains(@aria-label, 'parada')]"
-            );
+            const stops = getTextByXPath(li, ".//span[@aria-label='Voo direto.' or contains(@aria-label, 'parada')]");
             // Companhia aérea
-            let airline = getTextByXPath(
-              li,
-              ".//span[contains(@class, 'h1fkLb')]/span[1]"
-            );
-            if (!airline)
-              airline = getTextByXPath(
-                li,
-                ".//div[contains(@class, 'sSHqwe') and contains(@class, 'ogfYpf')]/span[1]"
-              );
+            let airline = getTextByXPath(li, ".//span[contains(@class, 'h1fkLb')]/span[1]");
+            if (!airline) airline = getTextByXPath(li, ".//div[contains(@class, 'sSHqwe') and contains(@class, 'ogfYpf')]/span[1]");
             // Emissões
-            let emissions = getTextByXPath(
-              li,
-              ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]"
-            );
-            if (!emissions)
-              emissions = getTextByXPath(
-                li,
-                ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]/span"
-              );
+            let emissions = getTextByXPath(li, ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]");
+            if (!emissions) emissions = getTextByXPath(li, ".//div[contains(@class, 'AdWm1c') and contains(@class, 'lc3qH')]/span");
             validFlights.push({
               departureTime: departureTime || "N/A",
               arrivalTime: arrivalTime || "N/A",
@@ -366,8 +354,7 @@ export class GoogleFlightsService {
       const prices1 = flights.map((f) => f.price).filter((p) => p > 0);
       const min1 = prices1.length ? Math.min(...prices1) : 0;
       const max1 = prices1.length ? Math.max(...prices1) : 0;
-      const looksSuspicious =
-        prices1.length >= 2 && (min1 < 80 || (max1 > 0 && min1 < max1 * 0.65));
+      const looksSuspicious = prices1.length >= 2 && (min1 < 80 || (max1 > 0 && min1 < max1 * 0.65));
       if (looksSuspicious) {
         console.log("Price looks suspicious, retrying...");
         await page.waitForTimeout(2000);
@@ -378,15 +365,9 @@ export class GoogleFlightsService {
       }
 
       const commonInfo = await page.evaluate(() => {
-        const originInput = document.querySelector(
-          'input[aria-label="De onde?"]'
-        ) as HTMLInputElement;
-        const destinationInput = document.querySelector(
-          'input[aria-label="Para onde?"]'
-        ) as HTMLInputElement;
-        const dateInput = document.querySelector(
-          'input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]'
-        ) as HTMLInputElement;
+        const originInput = document.querySelector('input[aria-label="De onde?"]') as HTMLInputElement;
+        const destinationInput = document.querySelector('input[aria-label="Para onde?"]') as HTMLInputElement;
+        const dateInput = document.querySelector('input.TP4Lpb.eoY5cb.j0Ppje[aria-label="Partida"]') as HTMLInputElement;
 
         if (!originInput || !destinationInput || !dateInput) {
           return null;

@@ -770,26 +770,19 @@ export class TelegramService {
           console.log(
             getTranslation("checkingTripMessage", "en", {
               tripId: trip.id,
-              origin: trip.flights[0].origin,
-              destination: trip.flights[0].destination,
+              origin: trip.flights[0]?.origin,
+              destination: trip.flights[0]?.destination,
               date: trip.date,
             })
           );
-          console.log(
-            getTranslation("tripUrlMessage", "en", { url: trip.url })
-          );
+          console.log(getTranslation("tripUrlMessage", "en", { url: trip.url }));
 
           // Determine the baseline price using the latest saved history when available
-          const lastHistory = await AppDataSource.manager.findOne(
-            PriceHistory,
-            {
-              where: { trip: { id: trip.id } as any },
-              order: { timestamp: "DESC" },
-            }
-          );
-          const oldLowestPrice =
-            lastHistory?.price ??
-            Math.min(...trip.flights.map((f) => f.currentPrice));
+          const lastHistory = await AppDataSource.manager.findOne(PriceHistory, {
+            where: { trip: { id: trip.id } as any },
+            order: { timestamp: "DESC" },
+          });
+          const oldLowestPrice = lastHistory?.price ?? Math.min(...trip.flights.map((f) => f.currentPrice));
           console.log(
             getTranslation("currentLowestPriceMessage", "en", {
               oldLowestPrice,
@@ -798,26 +791,32 @@ export class TelegramService {
 
           // Fetch new prices
           console.log(getTranslation("fetchingNewPricesMessage", "en"));
-          const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(
-            trip.url
-          );
+          const newFlights = await GoogleFlightsService.getFlightPricesFromUrl(trip.url, trip.id);
           console.log(
             getTranslation("foundNewFlightsMessage", "en", {
               count: newFlights.length,
             })
           );
 
+          // Se não há voos retornados, verificar se a trip ainda existe (pode ter sido deletada)
+          if (newFlights.length === 0) {
+            const tripStillExists = await AppDataSource.manager.findOne(Trip, {
+              where: { id: trip.id },
+            });
+            if (!tripStillExists) {
+              console.log(`Trip ${trip.id} was deleted, skipping...`);
+              continue;
+            }
+            // Se a trip ainda existe mas não há voos, pular para a próxima
+            console.log(`No flights found for trip ${trip.id}, skipping...`);
+            continue;
+          }
+
           const newLowestPrice = Math.min(...newFlights.map((f) => f.price));
-          console.log(
-            getTranslation("newLowestPriceMessage", "en", { newLowestPrice })
-          );
+          console.log(getTranslation("newLowestPriceMessage", "en", { newLowestPrice }));
 
           // Replace flights atomically to avoid stale entries causing duplicate alerts
-          await AppDataSource.createQueryBuilder()
-            .delete()
-            .from(Flight)
-            .where("tripId = :tripId", { tripId: trip.id })
-            .execute();
+          await AppDataSource.createQueryBuilder().delete().from(Flight).where("tripId = :tripId", { tripId: trip.id }).execute();
 
           const newFlightEntities: Flight[] = newFlights.map((info) => {
             const f = new Flight();
@@ -834,9 +833,7 @@ export class TelegramService {
             f.stopDetails = info.stopDetails;
             return f;
           });
-          const savedFlights = await AppDataSource.manager.save(
-            newFlightEntities
-          );
+          const savedFlights = await AppDataSource.manager.save(newFlightEntities);
           console.log(
             getTranslation("updatedFlightsMessage", "en", {
               count: savedFlights.length,
@@ -844,14 +841,18 @@ export class TelegramService {
           );
 
           // Create price history entry if price changed
-          if (newLowestPrice !== oldLowestPrice) {
-            const priceHistory = new PriceHistory();
-            priceHistory.price = newLowestPrice;
-            priceHistory.trip = trip;
-            await AppDataSource.manager.save(priceHistory);
-            console.log(
-              `Saved new price point R$ ${newLowestPrice} to history`
-            );
+          if (newLowestPrice !== oldLowestPrice && isFinite(newLowestPrice)) {
+            // Verificar novamente se a trip ainda existe antes de criar o histórico
+            const tripStillExists = await AppDataSource.manager.findOne(Trip, {
+              where: { id: trip.id },
+            });
+            if (tripStillExists) {
+              const priceHistory = new PriceHistory();
+              priceHistory.price = newLowestPrice;
+              priceHistory.trip = trip;
+              await AppDataSource.manager.save(priceHistory);
+              console.log(`Saved new price point R$ ${newLowestPrice} to history`);
+            }
           }
 
           // Calculate price change percentage
