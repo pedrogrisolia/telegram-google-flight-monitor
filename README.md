@@ -16,6 +16,7 @@ A Telegram bot that monitors flight prices using Google's Gemini AI and notifies
 - npm or yarn
 - Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 - Google Gemini API Key
+- Banco de dados local SQLite (arquivo em `DB_PATH`)
 
 ## Setup
 
@@ -46,6 +47,14 @@ npm run build
 5. Start the bot:
 ```bash
 npm start
+```
+
+## Docker Compose
+
+1. Certifique-se de ter o arquivo `.env` na raiz do projeto.
+2. Suba o serviço:
+```bash
+docker compose up --build
 ```
 
 ## Usage

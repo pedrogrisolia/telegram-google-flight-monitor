@@ -26,6 +26,7 @@
     "puppeteer-extra-plugin-block-resources": "^2.4.3",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "reflect-metadata": "^0.1.13",
+    "sqlite3": "^5.1.7",
     "tough-cookie": "^5.1.2",
     "typeorm": "^0.3.19"
   },
