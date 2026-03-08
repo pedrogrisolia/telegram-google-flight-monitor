@@ -218,21 +218,21 @@ export class GoogleFlightsService {
         .waitForXPath(
           '//*[text()="Todos os voos" or text()="Principais voos"]',
           {
-            timeout: 10000,
+            timeout: 30000,
           },
         )
         .then(() => ({ type: "success" as const }))
-        .catch(() => ({ type: "timeout" as const }));
+        .catch((error) => ({ type: "timeout" as const, error }));
 
       const errorMessagePromise = page
         .waitForXPath(
           './/*[text()="A data de voo solicitada é anterior à data atual."]',
           {
-            timeout: 10000,
+            timeout: 30000,
           },
         )
         .then(() => ({ type: "error" as const }))
-        .catch(() => ({ type: "timeout" as const }));
+        .catch((error) => ({ type: "timeout" as const, error }));
 
       const result = await Promise.race([
         mainContentPromise,
