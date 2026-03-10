@@ -1,6 +1,8 @@
 import { browserManager } from "./BrowserManager";
 import { AppDataSource } from "../config/database";
 import { Trip } from "../entities/Trip";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface StopDetails {
   airport: string;
@@ -56,6 +58,27 @@ export class GoogleFlightsService {
     const tfsMatch = url.match(/tfs=([^&]*)/);
     if (!tfsMatch) return 0;
     return (tfsMatch[1].match(/_/g) || []).length;
+  }
+
+  /**
+   * When a throw is about to happen during scraping, capture a screenshot and
+   * save the page HTML so we can inspect what went wrong.  Files are written
+   * under `data/debug` inside the container/workspace.
+   */
+  private static async saveDebug(page: any, label: string) {
+    try {
+      // root directory of project (inside docker container)
+      const dir = path.join(process.cwd(), "data", "debug");
+      fs.mkdirSync(dir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const base = path.join(dir, `${label}-${timestamp}`);
+      await page.screenshot({ path: `${base}.png`, fullPage: true });
+      const html = await page.content();
+      fs.writeFileSync(`${base}.html`, html);
+      console.log(`Saved debug screenshot/html: ${base}.{png,html}`);
+    } catch (err) {
+      console.error("Failed to save debug files", err);
+    }
   }
 
   static changeDateInUrl(
@@ -260,6 +283,7 @@ export class GoogleFlightsService {
       // Se encontrou a mensagem de erro primeiro, já retornou acima
       // Se não encontrou o conteúdo principal, lançar exceção
       if (result.type === "timeout") {
+        await GoogleFlightsService.saveDebug(page, "no-results-timeout");
         throw new Error(`No flight results found for ${url}`);
       }
 
@@ -268,6 +292,7 @@ export class GoogleFlightsService {
       );
 
       if (mainContent.length === 0) {
+        await GoogleFlightsService.saveDebug(page, "no-main-content");
         throw new Error(`No flight results found for ${url}`);
       }
 
@@ -409,6 +434,7 @@ export class GoogleFlightsService {
       let flights = await evaluateFlights();
 
       if (!flights) {
+        await GoogleFlightsService.saveDebug(page, "no-flight-info");
         throw new Error(`Failed to extract flight information for ${url}`);
       }
 
@@ -453,6 +479,7 @@ export class GoogleFlightsService {
       });
 
       if (!commonInfo) {
+        await GoogleFlightsService.saveDebug(page, "no-common-info");
         throw new Error(`Failed to extract flight details for ${url}`);
       }
       await page.close();
