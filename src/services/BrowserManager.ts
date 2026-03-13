@@ -36,7 +36,7 @@ class BrowserManager {
 
       this.browser = await puppeteerExtra.launch({
         executablePath: chromeExecutable,
-        headless: true,
+        headless: "new",
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",

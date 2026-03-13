@@ -26,6 +26,9 @@ export interface FlightDetails {
 }
 
 export class GoogleFlightsService {
+  private static readonly MAIN_CONTENT_XPATH =
+    '//*[normalize-space(text())="Todos os voos" or normalize-space(text())="Principais voos" or normalize-space(text())="Resultados da busca"]';
+
   private static validateGoogleFlightsUrl(url: string): boolean {
     try {
       const parsedUrl = new URL(url);
@@ -58,6 +61,87 @@ export class GoogleFlightsService {
     const tfsMatch = url.match(/tfs=([^&]*)/);
     if (!tfsMatch) return 0;
     return (tfsMatch[1].match(/_/g) || []).length;
+  }
+
+  private static async handleConsentIfPresent(page: any): Promise<boolean> {
+    const isConsentUrl = () => page.url().includes("consent.google.com");
+
+    const consentTitle = await page
+      .$x(
+        '//*[contains(text(), "Antes de acessar o Google") or contains(text(), "Before you continue to Google")]',
+      )
+      .catch(() => []);
+
+    if (!isConsentUrl() && consentTitle.length === 0) {
+      return false;
+    }
+
+    console.log("Google consent screen detected. Trying to proceed...");
+
+    const actionXpaths = [
+      '//button[contains(., "Recusar tudo")]',
+      '//*[@role="button" and contains(., "Recusar tudo")]',
+      '//button[contains(., "Reject all")]',
+      '//*[@role="button" and contains(., "Reject all")]',
+      '//button[contains(., "Aceitar tudo")]',
+      '//*[@role="button" and contains(., "Aceitar tudo")]',
+      '//button[contains(., "Accept all")]',
+      '//*[@role="button" and contains(., "Accept all")]',
+    ];
+
+    for (const xpath of actionXpaths) {
+      const buttons = await page.$x(xpath);
+      if (!buttons.length) continue;
+
+      try {
+        await Promise.all([
+          buttons[0].click(),
+          page
+            .waitForNavigation({ waitUntil: "networkidle0", timeout: 30000 })
+            .catch(() => null),
+        ]);
+        await page.waitForTimeout(1000);
+
+        if (!isConsentUrl()) {
+          console.log("Consent handled successfully.");
+          return true;
+        }
+      } catch (error) {
+        console.error("Error while trying to click consent button:", error);
+      }
+    }
+
+    const clickedByText = await page.evaluate(() => {
+      const labels = [
+        "Recusar tudo",
+        "Reject all",
+        "Aceitar tudo",
+        "Accept all",
+      ];
+      const candidates = Array.from(
+        document.querySelectorAll("button, [role='button']"),
+      ) as HTMLElement[];
+      const target = candidates.find((element) => {
+        const text = element.innerText?.trim() || "";
+        return labels.some((label) => text.includes(label));
+      });
+      if (!target) return false;
+      target.click();
+      return true;
+    });
+
+    if (clickedByText) {
+      await page
+        .waitForNavigation({ waitUntil: "networkidle0", timeout: 30000 })
+        .catch(() => null);
+      await page.waitForTimeout(1000);
+      if (!isConsentUrl()) {
+        console.log("Consent handled successfully (fallback click).");
+        return true;
+      }
+    }
+
+    return !isConsentUrl();
   }
 
   /**
@@ -235,21 +319,19 @@ export class GoogleFlightsService {
       }
 
       await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
+      await GoogleFlightsService.handleConsentIfPresent(page);
 
       // Buscar em paralelo pelo conteúdo principal e pela mensagem de erro
       const mainContentPromise = page
-        .waitForXPath(
-          '//*[text()="Todos os voos" or text()="Principais voos"]',
-          {
-            timeout: 30000,
-          },
-        )
+        .waitForXPath(GoogleFlightsService.MAIN_CONTENT_XPATH, {
+          timeout: 30000,
+        })
         .then(() => ({ type: "success" as const }))
         .catch((error) => ({ type: "timeout" as const, error }));
 
       const errorMessagePromise = page
         .waitForXPath(
-          './/*[text()="A data de voo solicitada é anterior à data atual."]',
+          '//*[text()="A data de voo solicitada é anterior à data atual."]',
           {
             timeout: 30000,
           },
@@ -283,12 +365,30 @@ export class GoogleFlightsService {
       // Se encontrou a mensagem de erro primeiro, já retornou acima
       // Se não encontrou o conteúdo principal, lançar exceção
       if (result.type === "timeout") {
-        await GoogleFlightsService.saveDebug(page, "no-results-timeout");
-        throw new Error(`No flight results found for ${url}`);
+        const consentHandled =
+          await GoogleFlightsService.handleConsentIfPresent(page);
+        if (consentHandled) {
+          const loadedAfterConsent = await page
+            .waitForXPath(GoogleFlightsService.MAIN_CONTENT_XPATH, {
+              timeout: 30000,
+            })
+            .then(() => true)
+            .catch(() => false);
+
+          if (loadedAfterConsent) {
+            console.log("Recovered from consent screen and loaded results.");
+          } else {
+            await GoogleFlightsService.saveDebug(page, "no-results-timeout");
+            throw new Error(`No flight results found for ${url}`);
+          }
+        } else {
+          await GoogleFlightsService.saveDebug(page, "no-results-timeout");
+          throw new Error(`No flight results found for ${url}`);
+        }
       }
 
       const mainContent = await page.$x(
-        '//*[text()="Todos os voos" or text()="Principais voos"]',
+        GoogleFlightsService.MAIN_CONTENT_XPATH,
       );
 
       if (mainContent.length === 0) {
