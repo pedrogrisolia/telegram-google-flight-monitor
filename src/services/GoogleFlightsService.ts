@@ -303,9 +303,11 @@ export class GoogleFlightsService {
     tripId?: number,
   ): Promise<FlightDetails[]> {
     let lastError: Error | null = null;
+    let page: any = null;
 
-    const page = await browserManager.getNewPage();
     try {
+      page = await browserManager.getNewPage();
+
       if (!url.includes("curr=BRL")) {
         url += (url.includes("?") ? "&" : "?") + "curr=BRL";
       }
@@ -327,7 +329,7 @@ export class GoogleFlightsService {
           timeout: 30000,
         })
         .then(() => ({ type: "success" as const }))
-        .catch((error) => ({ type: "timeout" as const, error }));
+        .catch((error: unknown) => ({ type: "timeout" as const, error }));
 
       const errorMessagePromise = page
         .waitForXPath(
@@ -337,7 +339,7 @@ export class GoogleFlightsService {
           },
         )
         .then(() => ({ type: "error" as const }))
-        .catch((error) => ({ type: "timeout" as const, error }));
+        .catch((error: unknown) => ({ type: "timeout" as const, error }));
 
       const result = await Promise.race([
         mainContentPromise,
@@ -590,13 +592,15 @@ export class GoogleFlightsService {
     } catch (error: any) {
       console.error("Error scraping flight prices:", error);
       lastError = error;
-      if (!page.isClosed()) {
+      if (page && !page.isClosed()) {
         await page.close();
       }
     } finally {
-      if (!page.isClosed()) {
+      if (page && !page.isClosed()) {
         await page.close();
       }
+
+      await browserManager.closeBrowserIfIdle();
     }
 
     throw new Error(`Failed to fetch flight prices. Last error: ${lastError?.message}

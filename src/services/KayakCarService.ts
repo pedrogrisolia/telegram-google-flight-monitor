@@ -1,4 +1,4 @@
-import { TimeoutError } from "puppeteer";
+import puppeteer, { Browser, TimeoutError } from "puppeteer";
 import { browserManager } from "./BrowserManager";
 
 export interface CarRentalDetails {
@@ -7,7 +7,76 @@ export interface CarRentalDetails {
   url: string;
 }
 
+interface KayakProxyConfig {
+  proxyServer: string;
+  username?: string;
+  password?: string;
+}
+
 export class KayakCarService {
+  private static getKayakProxyConfig(): KayakProxyConfig | null {
+    const rawProxy = process.env.KAYAK_PROXY_URL?.trim();
+    if (!rawProxy) {
+      return null;
+    }
+
+    const normalizedProxy = rawProxy.includes("://")
+      ? rawProxy
+      : `http://${rawProxy}`;
+
+    let parsedProxy: URL;
+    try {
+      parsedProxy = new URL(normalizedProxy);
+    } catch {
+      throw new Error(
+        "Invalid KAYAK_PROXY_URL format. Use: http://user:pass@host:port",
+      );
+    }
+
+    const proxyServer = `${parsedProxy.protocol}//${parsedProxy.hostname}${
+      parsedProxy.port ? `:${parsedProxy.port}` : ""
+    }`;
+
+    return {
+      proxyServer,
+      username: parsedProxy.username
+        ? decodeURIComponent(parsedProxy.username)
+        : undefined,
+      password: parsedProxy.password
+        ? decodeURIComponent(parsedProxy.password)
+        : undefined,
+    };
+  }
+
+  private static async launchProxyBrowser(
+    proxyConfig: KayakProxyConfig,
+  ): Promise<Browser> {
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-infobars",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-extensions",
+        "--lang=pt-BR",
+        `--proxy-server=${proxyConfig.proxyServer}`,
+      ],
+    };
+
+    const chromeExecutable =
+      process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
+
+    if (chromeExecutable) {
+      launchOptions.executablePath = chromeExecutable;
+    }
+
+    return puppeteer.launch(launchOptions);
+  }
+
   static async getMinCarPrice(
     airportCode: string,
     startDate: string,
@@ -15,9 +84,24 @@ export class KayakCarService {
     onTimeout?: (screenshot: Buffer) => Promise<void>
   ): Promise<CarRentalDetails> {
     const url = `https://www.kayak.com.br/cars/${airportCode}/${startDate}/${endDate}?sort=price_a`;
-    const browser = await browserManager.getBrowser();
-    const page = await browser.newPage();
+    const proxyConfig = this.getKayakProxyConfig();
+    const usingProxyBrowser = Boolean(proxyConfig);
+    let browser: Browser | null = null;
+    let page: any = null;
+
     try {
+      browser = usingProxyBrowser
+        ? await this.launchProxyBrowser(proxyConfig!)
+        : await browserManager.getBrowser();
+      page = await browser.newPage();
+
+      if (proxyConfig?.username) {
+        await page.authenticate({
+          username: proxyConfig.username,
+          password: proxyConfig.password || "",
+        });
+      }
+
       // set human-like headers
       await page.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
@@ -70,7 +154,7 @@ export class KayakCarService {
       if (!result) throw new Error("Nenhum resultado encontrado");
       return result;
     } catch (error) {
-      if (onTimeout && error instanceof TimeoutError) {
+      if (onTimeout && page && error instanceof TimeoutError) {
         try {
           const screenshot = await page.screenshot();
           await onTimeout(screenshot);
@@ -78,7 +162,12 @@ export class KayakCarService {
       }
       throw error;
     } finally {
-      await page.close().catch(() => {});
+      if (page) {
+        await page.close().catch(() => {});
+      }
+      if (usingProxyBrowser && browser) {
+        await browser.close().catch(() => {});
+      }
     }
   }
 }

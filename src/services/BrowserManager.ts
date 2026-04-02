@@ -97,6 +97,24 @@ class BrowserManager {
       this.browser = null;
     }
   }
+
+  public async closeBrowserIfIdle() {
+    if (!this.browser) {
+      return;
+    }
+
+    try {
+      const pages = await this.browser.pages();
+      const hasOpenPages = pages.some((page) => !page.isClosed());
+
+      if (!hasOpenPages) {
+        await this.browser.close();
+        this.browser = null;
+      }
+    } catch (error) {
+      console.error("Failed to close idle browser:", error);
+    }
+  }
 }
 
 export const browserManager = new BrowserManager();
