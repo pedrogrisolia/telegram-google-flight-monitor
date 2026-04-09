@@ -1,8 +1,13 @@
-import { Browser, Page } from "puppeteer";
+import {
+  Browser,
+  Page,
+  DEFAULT_INTERCEPT_RESOLUTION_PRIORITY,
+} from "puppeteer";
 import puppeteerExtra from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AnonymizeUAPlugin from "puppeteer-extra-plugin-anonymize-ua";
 import BlockResourcesPlugin from "puppeteer-extra-plugin-block-resources";
+import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 class BrowserManager {
   private browser: Browser | null = null;
@@ -12,9 +17,17 @@ class BrowserManager {
     puppeteerExtra.use(StealthPlugin());
     puppeteerExtra.use(AnonymizeUAPlugin());
     puppeteerExtra.use(
+      AdblockerPlugin({
+        blockTrackers: true,
+        blockTrackersAndAnnoyances: true,
+        useCache: true,
+        interceptResolutionPriority: DEFAULT_INTERCEPT_RESOLUTION_PRIORITY,
+      }),
+    );
+    puppeteerExtra.use(
       BlockResourcesPlugin({
         blockedTypes: new Set(["image", "media", "font", "stylesheet"]),
-      })
+      }),
     );
   }
 

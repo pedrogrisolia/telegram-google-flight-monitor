@@ -1,4 +1,5 @@
-import puppeteer, { Browser, TimeoutError } from "puppeteer";
+import { Browser, TimeoutError } from "puppeteer";
+import puppeteerExtra from "puppeteer-extra";
 import { browserManager } from "./BrowserManager";
 
 export interface CarRentalDetails {
@@ -14,13 +15,6 @@ interface KayakProxyConfig {
 }
 
 export class KayakCarService {
-  private static readonly BLOCKED_RESOURCE_TYPES = new Set([
-    "image",
-    "media",
-    "font",
-    "stylesheet",
-  ]);
-
   private static readonly DEFAULT_BLOCKED_DOMAINS = ["content.r9cdn.net"];
 
   private static getBlockedDomains(): string[] {
@@ -34,34 +28,25 @@ export class KayakCarService {
     ];
   }
 
-  private static shouldBlockDomain(hostname: string, blockedDomains: string[]) {
-    return blockedDomains.some(
-      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
-    );
-  }
-
   private static async optimizeProxyTraffic(page: any): Promise<void> {
     const blockedDomains = this.getBlockedDomains();
-    await page.setRequestInterception(true);
+    const blockedUrlPatterns = [
+      ...new Set(
+        blockedDomains.flatMap((domain) => [
+          `*://${domain}/*`,
+          `*://*.${domain}/*`,
+        ]),
+      ),
+    ];
 
-    page.on("request", (request: any) => {
-      const resourceType = request.resourceType();
-      if (this.BLOCKED_RESOURCE_TYPES.has(resourceType)) {
-        request.abort().catch(() => {});
-        return;
-      }
+    if (!blockedUrlPatterns.length) {
+      return;
+    }
 
-      try {
-        const { hostname } = new URL(request.url());
-        if (this.shouldBlockDomain(hostname.toLowerCase(), blockedDomains)) {
-          request.abort().catch(() => {});
-          return;
-        }
-      } catch {
-        // If URL parsing fails, allow request to avoid breaking navigation.
-      }
-
-      request.continue().catch(() => {});
+    const cdpSession = await page.target().createCDPSession();
+    await cdpSession.send("Network.enable");
+    await cdpSession.send("Network.setBlockedURLs", {
+      urls: blockedUrlPatterns,
     });
   }
 
@@ -102,7 +87,7 @@ export class KayakCarService {
   private static async launchProxyBrowser(
     proxyConfig: KayakProxyConfig,
   ): Promise<Browser> {
-    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+    const launchOptions: any = {
       headless: "new",
       args: [
         "--no-sandbox",
@@ -125,7 +110,7 @@ export class KayakCarService {
       launchOptions.executablePath = chromeExecutable;
     }
 
-    return puppeteer.launch(launchOptions);
+    return puppeteerExtra.launch(launchOptions);
   }
 
   static async getMinCarPrice(
