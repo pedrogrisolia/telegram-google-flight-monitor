@@ -14,6 +14,57 @@ interface KayakProxyConfig {
 }
 
 export class KayakCarService {
+  private static readonly BLOCKED_RESOURCE_TYPES = new Set([
+    "image",
+    "media",
+    "font",
+    "stylesheet",
+  ]);
+
+  private static readonly DEFAULT_BLOCKED_DOMAINS = ["content.r9cdn.net"];
+
+  private static getBlockedDomains(): string[] {
+    const envBlockedDomains = (process.env.KAYAK_BLOCKED_DOMAINS || "")
+      .split(",")
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean);
+
+    return [
+      ...new Set([...this.DEFAULT_BLOCKED_DOMAINS, ...envBlockedDomains]),
+    ];
+  }
+
+  private static shouldBlockDomain(hostname: string, blockedDomains: string[]) {
+    return blockedDomains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    );
+  }
+
+  private static async optimizeProxyTraffic(page: any): Promise<void> {
+    const blockedDomains = this.getBlockedDomains();
+    await page.setRequestInterception(true);
+
+    page.on("request", (request: any) => {
+      const resourceType = request.resourceType();
+      if (this.BLOCKED_RESOURCE_TYPES.has(resourceType)) {
+        request.abort().catch(() => {});
+        return;
+      }
+
+      try {
+        const { hostname } = new URL(request.url());
+        if (this.shouldBlockDomain(hostname.toLowerCase(), blockedDomains)) {
+          request.abort().catch(() => {});
+          return;
+        }
+      } catch {
+        // If URL parsing fails, allow request to avoid breaking navigation.
+      }
+
+      request.continue().catch(() => {});
+    });
+  }
+
   private static getKayakProxyConfig(): KayakProxyConfig | null {
     const rawProxy = process.env.KAYAK_PROXY_URL?.trim();
     if (!rawProxy) {
@@ -81,7 +132,7 @@ export class KayakCarService {
     airportCode: string,
     startDate: string,
     endDate: string,
-    onTimeout?: (screenshot: Buffer) => Promise<void>
+    onTimeout?: (screenshot: Buffer) => Promise<void>,
   ): Promise<CarRentalDetails> {
     const url = `https://www.kayak.com.br/cars/${airportCode}/${startDate}/${endDate}?sort=price_a`;
     const proxyConfig = this.getKayakProxyConfig();
@@ -102,9 +153,13 @@ export class KayakCarService {
         });
       }
 
+      if (usingProxyBrowser) {
+        await this.optimizeProxyTraffic(page);
+      }
+
       // set human-like headers
       await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
       );
       await page.setViewport({ width: 1280, height: 800 });
       await page.evaluateOnNewDocument(() => {
